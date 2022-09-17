@@ -165,7 +165,7 @@ func sync(opts *Options, dc *dict.Dictionary, ok bool) {
 		cmd := util.ExecCommand(opts.RestartRimeCmd, false)
 		err := cmd.Run()
 		if err != nil {
-			fmt.Println("exec restart rime cmd error:", err)
+			panic(fmt.Errorf("exec restart rime cmd error:%v", err))
 		}
 	}
 }

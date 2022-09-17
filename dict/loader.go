@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -129,12 +130,7 @@ func parseExtendPaths(path string, yamlContent []byte) ([]string, error) {
 	}
 	importTables := yamlConfig["import_tables"]
 	if importTables != nil {
-		// fix path
-		splits := strings.Split(path, "/")
-		pathFixed := ""
-		for i := 0; i < len(splits)-1; i++ {
-			pathFixed += splits[i] + "/"
-		}
+		pathFixed := filepath.Dir(path) + string(os.PathSeparator)
 		typeOf := reflect.TypeOf(importTables)
 		if typeOf.Kind() == reflect.Slice {
 			for _, extendDict := range importTables.([]interface{}) {
