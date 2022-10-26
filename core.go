@@ -12,17 +12,21 @@ import (
 )
 
 func Start(opts *Options) {
+	// load dict file and create dictionary
 	start := time.Now()
-	fes := dict.LoadItems(opts.DictPath)
+	fes := make([]*dict.FileEntries, 0)
+	for _, dictPath := range opts.DictPaths {
+		fes = append(fes, dict.LoadItems(dictPath)...)
+	}
 	since := time.Since(start)
-	log.Printf("Load %s: %s\n", opts.DictPath, since)
+	log.Printf("Load %s: %s\n", opts.DictPaths, since)
 	dc := dict.NewDictionary(fes, &dict.CacheMatcher{})
 
+	// collect file name, will show on addition
 	fileNames := make([]tui.ItemRender, 0)
 	if opts.UserPath != "" {
 		fileNames = append(fileNames, &dict.FileEntries{FilePath: opts.UserPath})
 	}
-
 	for _, f := range dc.Files() {
 		fileNames = append(fileNames, f)
 	}
@@ -69,8 +73,9 @@ func Start(opts *Options) {
 			}
 			pair := dict.ParseInput(raw)
 			if pair[1] != "" {
+				filePath := m.CurrItem().String()
 				dc.ResetMatcher()
-				dc.Add(dict.NewEntryAdd(strings.Join(pair[:], "\t"), m.CurrItem().String()))
+				dc.Add(dict.NewEntryAdd([]byte(strings.Join(pair[:], "\t")), filePath))
 				m.Inputs = []string{}
 				m.InputCursor = 0
 				sync(opts, dc, opts.SyncOnChange)
@@ -114,7 +119,7 @@ func Start(opts *Options) {
 		switch item := modifyingItem.(type) {
 		case *dict.Entry:
 			dc.ResetMatcher()
-			item.ReRaw(str)
+			item.ReRaw([]byte(str))
 			sync(opts, dc, opts.SyncOnChange)
 		}
 		modifying = false

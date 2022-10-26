@@ -58,8 +58,13 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry) []*Entry {
 	sort.Slice(matched, func(i, j int) bool {
 		r := matched[i].result.Score - matched[j].result.Score
 		if s := 1; r == 0 {
+			iLen, jLen := len(matched[i].entry.Pair), len(matched[j].entry.Pair)
+			// noAscii search,
 			if key[0] >= 0x80 {
 				s = 0
+			}
+			if s >= iLen || s >= jLen {
+				return iLen < jLen
 			}
 			r = len(matched[i].entry.Pair[s]) - len(matched[j].entry.Pair[s])
 			if s = 1 - s; r == 0 {

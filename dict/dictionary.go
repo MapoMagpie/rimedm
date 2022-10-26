@@ -1,14 +1,13 @@
 package dict
 
 import (
+	"bytes"
 	"github.com/junegunn/fzf/src/util"
 	"log"
-	"sort"
 	"time"
 )
 
 type Dictionary struct {
-	entries     []*Entry
 	matcher     Matcher
 	fileEntries []*FileEntries
 }
@@ -17,34 +16,33 @@ func NewDictionary(fes []*FileEntries, matcher Matcher) *Dictionary {
 	if matcher == nil {
 		matcher = &CacheMatcher{}
 	}
-	entries := make([]*Entry, 0)
-	if len(fes) > 0 {
-		for _, fe := range fes {
-			entries = append(entries, fe.Entries...)
-		}
-	}
-	start := time.Now()
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].refFile < entries[j].refFile
-	})
-	since := time.Since(start)
-	log.Printf("sort entries: %v\n", since)
 	return &Dictionary{
-		entries:     entries,
 		fileEntries: fes,
 		matcher:     matcher,
 	}
 }
 
+func (d *Dictionary) Entries() []*Entry {
+	entries := make([]*Entry, 0)
+	for _, fe := range d.fileEntries {
+		entries = append(entries, fe.Entries...)
+	}
+	return entries
+}
+
 func (d *Dictionary) Search(key []rune) []*Entry {
 	if len(key) == 0 {
-		return d.entries
+		return d.Entries()
 	}
-	return d.matcher.Search(key, d.entries)
+	return d.matcher.Search(key, d.Entries())
 }
 
 func (d *Dictionary) Add(entry *Entry) {
-	d.entries = append(d.entries, entry)
+	for _, fe := range d.fileEntries {
+		if fe.FilePath == entry.refFile {
+			fe.Entries = append(fe.Entries, entry)
+		}
+	}
 }
 
 func (d *Dictionary) Delete(entry *Entry) {
@@ -56,12 +54,16 @@ func (d *Dictionary) ResetMatcher() {
 }
 
 func (d *Dictionary) Len() int {
-	return len(d.entries)
+	le := 0
+	for _, fe := range d.fileEntries {
+		le = le + len(fe.Entries)
+	}
+	return le
 }
 
 func (d *Dictionary) Flush() {
 	start := time.Now()
-	output(d.entries, d.fileEntries)
+	output(d.fileEntries)
 	since := time.Since(start)
 	log.Printf("flush dictionary: %v\n", since)
 }
@@ -81,23 +83,26 @@ const (
 
 type Entry struct {
 	text    util.Chars
-	Pair    []string // 0 汉字 1 code 3 权重
+	Pair    [][]byte // 0 汉字 1 code 3 权重
 	refFile string
 	seek    int64
 	rawSize int64
 	modType ModifyType
+	log     bool
 }
 
-func (e *Entry) ReRaw(raw string) {
-	e.text = util.ToChars([]byte(raw))
+func (e *Entry) ReRaw(raw []byte) {
+	e.text = util.ToChars(raw)
 	e.Pair = ParsePair(raw)
 	if e.modType != ADD {
 		e.modType = MODIFY
 	}
+	e.log = true
 }
 
 func (e *Entry) Delete() {
 	e.modType = DELETE
+	e.log = true
 }
 
 func (e *Entry) IsDelete() bool {
@@ -105,7 +110,23 @@ func (e *Entry) IsDelete() bool {
 }
 
 func (e *Entry) String() string {
+	//return e.text.ToString() + "\t" + e.refFile
 	return e.text.ToString()
+}
+
+func (e *Entry) Logged() {
+	e.log = false
+}
+
+func (e *Entry) WriteLine() []byte {
+	bs := make([]byte, 0)
+	for i := 0; i < len(e.Pair); i++ {
+		bs = append(bs, e.Pair[i]...)
+		if i <= len(e.Pair)-1 {
+			bs = append(bs, '\t')
+		}
+	}
+	return bs
 }
 
 // ParseInput \n
@@ -154,30 +175,23 @@ func isAscii(str string) bool {
 	return true
 }
 
-func ParsePair(raw string) []string {
-	defer func(raw string) {
-		if p := recover(); p != nil {
-			log.Fatalf("split raw [%s] panic: %v\n", raw, p)
+func ParsePair(raw []byte) [][]byte {
+	pair := make([][]byte, 0)
+	for i, j := 0, 0; i < len(raw); i++ {
+		if raw[i] == '\t' {
+			pair = append(pair, bytes.TrimSpace(raw[j:i]))
+			j = i + 1
 		}
-	}(raw)
-	pair := make([]string, 3)
-	for j, l, i := 0, 0, 0; i <= len(raw); i++ {
-		if i == len(raw) || raw[i] == '\t' {
-			if l == i {
-				l = i + 1
-				continue
-			}
-			pair[j] = raw[l:i]
-			l = i + 1
-			j++
+		if i == len(raw)-1 && j < i {
+			pair = append(pair, bytes.TrimSpace(raw[j:]))
 		}
 	}
 	return pair
 }
 
-func NewEntry(raw string, refFile string, seek int64, size int64) *Entry {
+func NewEntry(raw []byte, refFile string, seek int64, size int64) *Entry {
 	return &Entry{
-		text:    util.ToChars([]byte(raw)),
+		text:    util.ToChars(raw),
 		Pair:    ParsePair(raw),
 		refFile: refFile,
 		seek:    seek,
@@ -185,11 +199,12 @@ func NewEntry(raw string, refFile string, seek int64, size int64) *Entry {
 	}
 }
 
-func NewEntryAdd(raw string, refFile string) *Entry {
+func NewEntryAdd(raw []byte, refFile string) *Entry {
 	return &Entry{
-		text:    util.ToChars([]byte(raw)),
+		text:    util.ToChars(raw),
 		Pair:    ParsePair(raw),
 		refFile: refFile,
 		modType: ADD,
+		log:     true,
 	}
 }

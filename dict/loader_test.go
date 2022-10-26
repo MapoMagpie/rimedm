@@ -14,7 +14,7 @@ func Test_loadItems(t *testing.T) {
 		name string
 		args args
 	}{
-		{"1", args{"../rime/xkjd6.dict.yaml"}},
+		{"1", args{"../rime/xkjd/xkjd6.dict.yaml"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

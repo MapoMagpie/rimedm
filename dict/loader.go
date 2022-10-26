@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"sync"
 )
 
@@ -46,6 +45,11 @@ func LoadItems(path string) (fes []*FileEntries) {
 	return
 }
 
+var (
+	YamlBegin = []byte{'-', '-', '-'}
+	YamlEnd   = []byte{'.', '.', '.'}
+)
+
 func loadFromFile(path string, ch chan<- *FileEntries, wg *sync.WaitGroup) {
 	defer wg.Done()
 	fe := &FileEntries{FilePath: path, Entries: make([]*Entry, 0)}
@@ -70,32 +74,35 @@ func loadFromFile(path string, ch chan<- *FileEntries, wg *sync.WaitGroup) {
 		return
 	}
 
-	duringYaml := 0 // 0: not in yaml, 1: in yaml, 2: out yaml
+	duringYaml := 0 // 0: not in yaml, 1: in yaml
 	yamlContent := make([]byte, 0)
 	var seek int64 = 0
 	for {
 		bs, eof := bf.ReadBytes('\n')
 		size := len(bs)
 		seek += int64(size)
-		line := string(bs)
 		if size > 0 {
-			if strings.Index(line, "#") == 0 {
+			if bs[0] == '#' {
 				continue
 			}
-			if strings.Index(line, "---") == 0 {
+			if bytes.Equal(bytes.TrimSpace(bs), YamlBegin) {
 				duringYaml = 1
 				continue
-			} else if strings.Index(line, "...") == 0 {
+			} else if bytes.Equal(bytes.TrimSpace(bs), YamlEnd) {
 				loadExtendDict(path, yamlContent, ch, wg)
-				duringYaml = 2
+				duringYaml = 0
 				continue
 			}
 			if duringYaml == 1 {
 				yamlContent = append(yamlContent, bs...)
 				continue
 			}
-			if duringYaml == 2 {
-				fe.Entries = append(fe.Entries, NewEntry(strings.TrimSpace(line), path, seek-int64(size), int64(size)))
+			if duringYaml == 0 {
+				bs = bytes.TrimSpace(bs)
+				if len(bs) == 0 {
+					continue
+				}
+				fe.Entries = append(fe.Entries, NewEntry(bs, path, seek-int64(size), int64(size)))
 			}
 		}
 		if eof != nil {

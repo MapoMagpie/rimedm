@@ -1,24 +1,29 @@
 package main
 
-import (
-	"fmt"
-	"testing"
-)
+import "testing"
 
-func Test_parseConfig(t *testing.T) {
+func Test_findRimeDefaultSchema(t *testing.T) {
 	type args struct {
-		path string
+		rimeConfigPath string
 	}
 	tests := []struct {
 		name string
 		args args
+		want string
 	}{
-		{"1", args{path: "./testdata/config.yaml"}},
+		{
+			name: "default.custom.yaml",
+			args: args{
+				"./rime/default.custom.yaml",
+			},
+			want: "xkjd6",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := parseConfig(tt.args.path)
-			fmt.Println(got)
+			if got := findRimeDefaultSchema(tt.args.rimeConfigPath); got != tt.want {
+				t.Errorf("findRimeDefaultSchema() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

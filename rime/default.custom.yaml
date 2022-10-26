@@ -1,0 +1,15 @@
+# default.custom.yaml
+patch:
+  switcher:
+    caption: "「切换方案」"
+    hotkeys:
+      - "F4"
+  schema_list:
+    - schema: xkjd6
+  menu:
+    page_size: 9
+  style/horizontal: false
+  style/font_point: 17
+  style/inline_preedit: true
+  ascii_composer/switch_key/Shift_L: noop
+  ascii_composer/switch_key/Shift_R: commit_code

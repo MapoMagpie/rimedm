@@ -4,38 +4,23 @@ import (
 	"log"
 	"os"
 	"sort"
-	"strings"
 	"sync"
 )
 
-func output(entries []*Entry, fes []*FileEntries) {
-	fMap := make(map[string][]*Entry)
-	for _, entry := range entries {
-		if entry.modType == NC {
-			continue
-		}
-		entries := fMap[entry.refFile]
-		fMap[entry.refFile] = append(entries, entry)
-	}
+func output(fes []*FileEntries) {
 	var wg sync.WaitGroup
-	wg.Add(len(fMap))
-	for fileName, entries := range fMap {
-		if entries == nil || len(entries) == 0 {
+	wg.Add(len(fes))
+	for _, fe := range fes {
+		if len(fe.Entries) == 0 {
 			continue
 		}
-		var fe *FileEntries
-		for _, f := range fes {
-			if fe = f; f.FilePath == fileName {
-				break
-			}
-		}
-		go func(buf []byte, path string, entries []*Entry) {
+		go func(fe *FileEntries) {
 			defer wg.Done()
-			sort.Slice(entries, func(i, j int) bool {
-				return entries[i].seek < entries[j].seek
+			sort.Slice(fe.Entries, func(i, j int) bool {
+				return fe.Entries[i].seek < fe.Entries[j].seek
 			})
-			outputFile(buf, path, entries)
-		}(fe.RawBs, fe.FilePath, entries)
+			outputFile(fe.RawBs, fe.FilePath, fe.Entries)
+		}(fe)
 	}
 	wg.Wait()
 }
@@ -66,7 +51,8 @@ func outputFile(rawBs []byte, path string, entries []*Entry) {
 			seekFixed = seekFixed - entry.rawSize
 			modType = "DELETE"
 		case MODIFY:
-			nbs := []byte(strings.TrimSpace(strings.Join(entry.Pair, "\t")) + "\n")
+			nbs := entry.WriteLine()
+			nbs = append(nbs, '\n')
 			bs = append(bs[:entry.seek+seekFixed], append(nbs, bs[entry.seek+seekFixed+entry.rawSize:]...)...)
 			seekFixed = seekFixed - entry.rawSize + int64(len(nbs))
 			modType = "MODIFY"
@@ -74,14 +60,18 @@ func outputFile(rawBs []byte, path string, entries []*Entry) {
 			willAddEntries = append(willAddEntries, entry)
 			modType = "ADD"
 		}
-		log.Printf("modify dict type:%s | %s", modType, entry.String())
+		if entry.log {
+			log.Printf("modify dict type:%s | %s", modType, entry.String())
+			entry.Logged()
+		}
 	}
 	if len(willAddEntries) > 0 {
 		if bs[len(bs)-1] != '\n' {
 			bs = append(bs, '\n')
 		}
 		for _, entry := range willAddEntries {
-			nbs := []byte(strings.TrimSpace(strings.Join(entry.Pair, "\t")) + "\n")
+			nbs := entry.WriteLine()
+			nbs = append(nbs, '\n')
 			bs = append(bs, nbs...)
 		}
 	}
