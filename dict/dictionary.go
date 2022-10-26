@@ -121,8 +121,11 @@ func (e *Entry) Logged() {
 func (e *Entry) WriteLine() []byte {
 	bs := make([]byte, 0)
 	for i := 0; i < len(e.Pair); i++ {
+		if len(bytes.TrimSpace(e.Pair[i])) == 0 {
+			continue
+		}
 		bs = append(bs, e.Pair[i]...)
-		if i <= len(e.Pair)-1 {
+		if i < len(e.Pair)-1 {
 			bs = append(bs, '\t')
 		}
 	}
