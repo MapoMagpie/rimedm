@@ -1,6 +1,7 @@
 package dict
 
 import (
+	"fmt"
 	"github.com/junegunn/fzf/src/algo"
 	"github.com/junegunn/fzf/src/util"
 	"sort"
@@ -47,6 +48,10 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry) []*Entry {
 		if entry.modType == DELETE {
 			continue
 		}
+		if len(entry.Pair) == 0 {
+			fmt.Println(entry.String())
+			continue
+		}
 		result, _ := algo.FuzzyMatchV2(false, true, true, &entry.text, key, false, slab)
 		if result.Score > 0 {
 			matched = append(matched, entryResult{entry, result})
@@ -65,10 +70,15 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry) []*Entry {
 			}
 			if s >= iLen || s >= jLen {
 				return iLen < jLen
-			}
-			r = len(matched[i].entry.Pair[s]) - len(matched[j].entry.Pair[s])
-			if s = 1 - s; r == 0 {
+			} else {
 				r = len(matched[i].entry.Pair[s]) - len(matched[j].entry.Pair[s])
+			}
+			if s = 1 - s; r == 0 {
+				if s >= iLen || s >= jLen {
+					return iLen < jLen
+				} else {
+					r = len(matched[i].entry.Pair[s]) - len(matched[j].entry.Pair[s])
+				}
 			}
 			return r < 0
 		}
