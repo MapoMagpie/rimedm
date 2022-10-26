@@ -9,11 +9,11 @@ import (
 
 func output(fes []*FileEntries) {
 	var wg sync.WaitGroup
-	wg.Add(len(fes))
 	for _, fe := range fes {
 		if len(fe.Entries) == 0 {
 			continue
 		}
+		wg.Add(1)
 		go func(fe *FileEntries) {
 			defer wg.Done()
 			sort.Slice(fe.Entries, func(i, j int) bool {
