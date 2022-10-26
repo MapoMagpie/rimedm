@@ -4,6 +4,8 @@
 
 ## 演示
 ### 加词
+<div><video controls src="https://github.com/kamo2020/rimedm/blob/main/.assets/rimedm_%E4%BF%AE%E6%94%B9.mkv" muted="false"></video></div>
+
 ![加词](.assets/rimedm_加词.gif)
 ### 修改
 ![修改](.assets/rimedm_修改.gif)
