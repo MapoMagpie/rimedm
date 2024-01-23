@@ -68,6 +68,10 @@ func (d *Dictionary) Flush() {
 	log.Printf("flush dictionary: %v\n", since)
 }
 
+func (d *Dictionary) ExportDict(path string) {
+	exportDict(path, d.fileEntries)
+}
+
 func (d *Dictionary) Files() []*FileEntries {
 	return d.fileEntries
 }
@@ -86,7 +90,7 @@ type Entry struct {
 	Pair    [][]byte // 0 汉字 1 code 3 权重
 	refFile string
 	seek    int64
-	rawSize int64
+	rawSize int64 // 原始大小，不可变，用于重写文件时计算偏移量
 	modType ModifyType
 	log     bool
 }
@@ -185,7 +189,7 @@ func ParsePair(raw []byte) [][]byte {
 			pair = append(pair, bytes.TrimSpace(raw[j:i]))
 			j = i + 1
 		}
-		if i == len(raw)-1 && j < i {
+		if i == len(raw)-1 && j <= i {
 			pair = append(pair, bytes.TrimSpace(raw[j:]))
 		}
 	}

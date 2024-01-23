@@ -1,3 +1,4 @@
 /config/debug.log
 /.idea
-/rimedictmanager
+/rimedi*
+rimedictmanager

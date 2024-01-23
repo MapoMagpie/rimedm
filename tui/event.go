@@ -29,17 +29,6 @@ type Event struct {
 	Cb   func(key string, m *Model) (tea.Model, tea.Cmd)
 }
 
-var exitEvent = &Event{
-	Keys: []string{"ctrl+c", "esc"},
-	Cb: func(key string, m *Model) (tea.Model, tea.Cmd) {
-		if m.ShowMenu && key == "esc" {
-			m.ShowMenu = false
-			return m, nil
-		}
-		return m, tea.Quit
-	},
-}
-
 var moveEvent = &Event{
 	Keys: []string{"up", "ctrl+j", "down", "ctrl+k"},
 	Cb: func(key string, m *Model) (tea.Model, tea.Cmd) {

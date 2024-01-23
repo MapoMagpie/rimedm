@@ -7,6 +7,33 @@ import (
 	"sync"
 )
 
+func exportDict(path string, fes []*FileEntries) {
+	// sort fes by file name
+	sort.Slice(fes, func(i, j int) bool {
+		return fes[i].FilePath < fes[j].FilePath
+	})
+	file, err := os.Create(path)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+	for _, fe := range fes {
+		if len(fe.Entries) == 0 {
+			continue
+		}
+		for _, entry := range fe.Entries {
+			bs := entry.WriteLine()
+			bs = append(bs, '\n')
+			_, err := file.Write(bs)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+}
+
 func output(fes []*FileEntries) {
 	var wg sync.WaitGroup
 	for _, fe := range fes {

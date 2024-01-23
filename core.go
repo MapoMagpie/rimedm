@@ -152,6 +152,7 @@ func Start(opts *Options) {
 		return menuGroup1
 
 	}
+
 	exitEvent := &tui.Event{
 		Keys: []string{"esc", "ctrl+c"},
 		Cb: func(key string, m *tui.Model) (tea.Model, tea.Cmd) {
@@ -164,6 +165,17 @@ func Start(opts *Options) {
 			return m, tea.Quit
 		},
 	}
+
+	// 简单地合并码表并输出到当前目录中
+	exportDictEvent := &tui.Event{
+		Keys: []string{"ctrl+o"},
+		Cb: func(key string, m *tui.Model) (tea.Model, tea.Cmd) {
+			filePath := "output.txt"
+			dc.ExportDict(filePath)
+			return m, nil
+		},
+	}
+
 	//restartEvent := &tui.Event{
 	//	Keys: []string{"ctrl+r", "ctrl+u"},
 	//	Cb: func(key string, m *tui.Model) (tea.Model, tea.Cmd) {
@@ -172,7 +184,7 @@ func Start(opts *Options) {
 	//		return m, nil
 	//	},
 	//}
-	m := tui.NewModel(listFetcher, menuFetcher, exitEvent)
+	m := tui.NewModel(listFetcher, menuFetcher, exitEvent, exportDictEvent)
 	tui.Start(m)
 }
 

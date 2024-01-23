@@ -148,7 +148,7 @@ func (m *Model) View() string {
 	}
 	//footer
 	sb.WriteString(fmt.Sprintf("Total: %d\n", le))
-	sb.WriteString("Press[Enter:Menu][Ctrl+X:Clear Input][Ctrl+C|ESC:Quit]\n")
+	sb.WriteString("Press[Enter:Menu][Ctrl+X:Clear Input][Ctrl+C|ESC:Quit][Ctrl+O:Export Dict]\n")
 	sb.WriteString(line + "\n")
 
 	if menus := m.menuFetcher(); m.ShowMenu && len(menus) > 0 {
@@ -204,7 +204,7 @@ func NewModel(listFetcher func(m *Model) []ItemRender, menuFetcher func() []*Men
 		fmt.Printf("Terminal GetSize Error: %v\n", err)
 		os.Exit(1)
 	}
-	em := NewEventManager(exitEvent, moveEvent, enterEvent, moveMenuEvent, clearInputEvent)
+	em := NewEventManager(moveEvent, enterEvent, moveMenuEvent, clearInputEvent)
 	em.Add(events...)
 	return &Model{listFetcher: listFetcher, wx: wx, hx: hx, menuFetcher: menuFetcher, eventManager: em}
 }

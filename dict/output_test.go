@@ -1,8 +1,35 @@
 package dict
 
 import (
+	"bytes"
 	"testing"
 )
+
+func Test_writeLine(t *testing.T) {
+	tests := []struct {
+		name  string
+		entry Entry
+		want  []byte
+	}{
+		{
+			name:  "1",
+			entry: *NewEntryAdd([]byte("测试\tceek"), ""),
+			want:  []byte("测试\tceek"),
+		},
+		{
+			name:  "2",
+			entry: *NewEntryAdd([]byte("测试\tc"), ""),
+			want:  []byte("测试\tc"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.entry.WriteLine(); !bytes.Equal(got, tt.want) {
+				t.Errorf("writeLine() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func Test_outputFile(t *testing.T) {
 	type args struct {
