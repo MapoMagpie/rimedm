@@ -1,11 +1,13 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
-	tea "github.com/charmbracelet/bubbletea"
-	"golang.org/x/term"
 	"os"
 	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"golang.org/x/term"
 )
 
 type ItemRender interface {
@@ -32,8 +34,11 @@ type Model struct {
 	eventManager *EventManager
 }
 
-func (m *Model) CurrItem() ItemRender {
-	return m.list[m.currIndex]
+func (m *Model) CurrItem() (ItemRender, error) {
+	if len(m.list) == 0 {
+		return nil, errors.New("empty list")
+	}
+	return m.list[m.currIndex], nil
 }
 
 func (m *Model) CurrMenu() *Menu {

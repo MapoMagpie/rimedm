@@ -38,7 +38,6 @@ func LoadItems(path string) (fes []*FileEntries) {
 	for fe := range ch {
 		if fe.Err != nil {
 			fmt.Printf("load [%s] error: %s", fe.FilePath, fe.Err)
-			os.Exit(1)
 		}
 		fes = append(fes, fe)
 	}

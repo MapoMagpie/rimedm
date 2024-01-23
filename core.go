@@ -71,9 +71,13 @@ func Start(opts *Options) {
 			if raw == "" {
 				return
 			}
+			item, err := m.CurrItem()
+			if err != nil {
+				return
+			}
 			pair := dict.ParseInput(raw)
 			if pair[1] != "" {
-				filePath := m.CurrItem().String()
+				filePath := item.String()
 				dc.ResetMatcher()
 				dc.Add(dict.NewEntryAdd([]byte(strings.Join(pair[:], "\t")), filePath))
 				m.Inputs = []string{}
@@ -86,38 +90,49 @@ func Start(opts *Options) {
 	}}
 
 	// 删除菜单
-	var menuNameDelete = tui.Menu{Name: "Delete", Cb: func(m *tui.Model) tea.Cmd {
-		item := m.CurrItem()
+	var menuNameDelete = tui.Menu{Name: "Delete", Cb: func(m *tui.Model) (cmd tea.Cmd) {
+		cmd = func() tea.Msg {
+			return tui.ExitMenuMsg(1)
+		}
+		item, err := m.CurrItem()
+		if err != nil {
+			return
+		}
 		switch item := item.(type) {
 		case *dict.Entry:
 			dc.ResetMatcher()
 			dc.Delete(item)
 			sync(opts, dc, opts.SyncOnChange)
 		}
-		return func() tea.Msg {
-			return tui.ExitMenuMsg(1)
-		}
+		return
 	}}
 
 	// 修改菜单
 	var modifying = false
 	var modifyingItem tui.ItemRender
-	var menuNameModify = tui.Menu{Name: "Modify", Cb: func(m *tui.Model) tea.Cmd {
+	var menuNameModify = tui.Menu{Name: "Modify", Cb: func(m *tui.Model) (cmd tea.Cmd) {
+		cmd = func() tea.Msg {
+			return tui.ExitMenuMsg(1)
+		}
 		modifying = true
-		modifyingItem = m.CurrItem()
+		item, err := m.CurrItem()
+		if err != nil {
+			return
+		}
+		modifyingItem = item
 		m.Inputs = strings.Split(strings.TrimSpace(modifyingItem.String()), "")
 		m.InputCursor = len(m.Inputs)
 		m.MenuIndex = 0
-		return func() tea.Msg {
-			return tui.ExitMenuMsg(1)
-		}
+		return
 	}}
 
 	// 确认修改菜单
 	var menuNameConfirm = tui.Menu{Name: "Confirm", Cb: func(m *tui.Model) tea.Cmd {
 		str := strings.Join(m.Inputs, "")
+		log.Printf("modify confirm str: %s\n", str)
 		switch item := modifyingItem.(type) {
 		case *dict.Entry:
+			log.Printf("modify confirm item: %s\n", item)
 			dc.ResetMatcher()
 			item.ReRaw([]byte(str))
 			sync(opts, dc, opts.SyncOnChange)
