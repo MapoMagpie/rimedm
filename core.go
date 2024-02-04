@@ -1,14 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/junegunn/fzf/src/util"
 	"log"
+	"os"
 	"rimedictmanager/dict"
 	"rimedictmanager/tui"
+	"sort"
 	"strings"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/junegunn/fzf/src/util"
 )
 
 func Start(opts *Options) {
@@ -16,7 +20,11 @@ func Start(opts *Options) {
 	start := time.Now()
 	fes := make([]*dict.FileEntries, 0)
 	for _, dictPath := range opts.DictPaths {
-		fes = append(fes, dict.LoadItems(dictPath)...)
+		ret := dict.LoadItems(dictPath)
+		sort.Slice(ret, func(i, j int) bool {
+			return ret[i].Order() < ret[j].Order()
+		})
+		fes = append(fes, ret...)
 	}
 	since := time.Since(start)
 	log.Printf("Load %s: %s\n", opts.DictPaths, since)
@@ -31,47 +39,14 @@ func Start(opts *Options) {
 		fileNames = append(fileNames, f)
 	}
 
-	var listFetcher = func(m *tui.Model) []tui.ItemRender {
-		var items []tui.ItemRender
-		if m.ShowMenu && m.CurrMenu().Name == "Add" {
-			return fileNames
-		}
-		key := strings.TrimSpace(strings.Join(m.Inputs, ""))
-		rs := []rune(key)
-		if len(rs) > 0 {
-			pair := dict.ParseInput(key)
-			if pair[1] != "" {
-				var rsFiltered []rune
-				for _, r := range rs {
-					if r < 0x80 && r != ' ' && r != '\t' {
-						rsFiltered = append(rsFiltered, r)
-					}
-				}
-				rs = rsFiltered
-			}
-		}
-
-		list := dc.Search(rs)
-		for _, entry := range list {
-			if entry.IsDelete() {
-				continue
-			}
-			items = append(items, entry)
-		}
-		return items
-	}
-
 	// 添加菜单
 	var menuNameAdd = tui.Menu{Name: "Add", Cb: func(m *tui.Model) (cmd tea.Cmd) {
-		cmd = func() tea.Msg {
-			return tui.ExitMenuMsg(1)
-		}
 		if len(m.Inputs) > 0 {
 			raw := strings.TrimSpace(strings.Join(m.Inputs, ""))
 			if raw == "" {
 				return
 			}
-			item, err := m.CurrItem()
+			item, err := m.CurrItem() // file name
 			if err != nil {
 				return
 			}
@@ -86,34 +61,28 @@ func Start(opts *Options) {
 			} else {
 			}
 		}
-		return
+		return tui.ExitMenuCmd
 	}}
 
 	// 删除菜单
 	var menuNameDelete = tui.Menu{Name: "Delete", Cb: func(m *tui.Model) (cmd tea.Cmd) {
-		cmd = func() tea.Msg {
-			return tui.ExitMenuMsg(1)
-		}
 		item, err := m.CurrItem()
 		if err != nil {
 			return
 		}
 		switch item := item.(type) {
-		case *dict.Entry:
+		case *dict.MatchResult:
 			dc.ResetMatcher()
-			dc.Delete(item)
+			dc.Delete(item.Entry)
 			sync(opts, dc, opts.SyncOnChange)
 		}
-		return
+		return tui.ExitMenuCmd
 	}}
 
 	// 修改菜单
 	var modifying = false
 	var modifyingItem tui.ItemRender
 	var menuNameModify = tui.Menu{Name: "Modify", Cb: func(m *tui.Model) (cmd tea.Cmd) {
-		cmd = func() tea.Msg {
-			return tui.ExitMenuMsg(1)
-		}
 		modifying = true
 		item, err := m.CurrItem()
 		if err != nil {
@@ -123,7 +92,7 @@ func Start(opts *Options) {
 		m.Inputs = strings.Split(strings.TrimSpace(modifyingItem.String()), "")
 		m.InputCursor = len(m.Inputs)
 		m.MenuIndex = 0
-		return
+		return tui.ExitMenuCmd
 	}}
 
 	// 确认修改菜单
@@ -131,16 +100,14 @@ func Start(opts *Options) {
 		str := strings.Join(m.Inputs, "")
 		log.Printf("modify confirm str: %s\n", str)
 		switch item := modifyingItem.(type) {
-		case *dict.Entry:
+		case *dict.MatchResult:
 			log.Printf("modify confirm item: %s\n", item)
 			dc.ResetMatcher()
-			item.ReRaw([]byte(str))
+			item.Entry.ReRaw([]byte(str))
 			sync(opts, dc, opts.SyncOnChange)
 		}
 		modifying = false
-		return func() tea.Msg {
-			return tui.ExitMenuMsg(1)
-		}
+		return tui.ExitMenuCmd
 	}}
 
 	var menuGroup1 = []*tui.Menu{&menuNameAdd, &menuNameDelete, &menuNameModify}
@@ -176,16 +143,54 @@ func Start(opts *Options) {
 		},
 	}
 
-	//restartEvent := &tui.Event{
-	//	Keys: []string{"ctrl+r", "ctrl+u"},
-	//	Cb: func(key string, m *tui.Model) (tea.Model, tea.Cmd) {
-	//		dc.Flush()
-	//		m.FreshList()
-	//		return m, nil
-	//	},
-	//}
-	m := tui.NewModel(listFetcher, menuFetcher, exitEvent, exportDictEvent)
-	tui.Start(m)
+	searchChan := make(chan string)
+	listManager := tui.ListManager{SearchChan: searchChan}
+	model := tui.NewModel(&listManager, menuFetcher, exitEvent, exportDictEvent)
+	teaProgram := tea.NewProgram(model)
+
+	go func() {
+		var cancelFunc context.CancelFunc
+		ch := make(chan []*dict.MatchResult)
+		for {
+			select {
+			case raw := <-searchChan:
+				if model.ShowMenu && model.CurrMenu().Name == "Add" {
+					listManager.AppendList(fileNames)
+					teaProgram.Send(tui.FreshListMsg(0))
+					continue
+				}
+				ch = make(chan []*dict.MatchResult)
+				ctx, cancel := context.WithCancel(context.Background())
+				if cancelFunc != nil {
+					cancelFunc()
+				}
+				cancelFunc = cancel
+				rs := []rune(raw)
+				if len(raw) > 0 {
+					pair := dict.ParseInput(raw)
+					if pair[1] != "" {
+						rs = []rune(pair[1])
+					}
+				}
+				go dc.Search(rs, ch, ctx)
+			case ret := <-ch:
+				if ret != nil {
+					list := make([]tui.ItemRender, len(ret))
+					for i, entry := range ret {
+						list[i] = entry
+					}
+					log.Println("recv list: ", len(list))
+					listManager.AppendList(list)
+					teaProgram.Send(tui.FreshListMsg(0))
+				}
+			}
+		}
+	}()
+
+	if _, err := teaProgram.Run(); err != nil {
+		fmt.Printf("Tui Program Error: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 func sync(opts *Options, dc *dict.Dictionary, ok bool) {

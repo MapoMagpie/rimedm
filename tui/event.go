@@ -34,7 +34,7 @@ var moveEvent = &Event{
 	Cb: func(key string, m *Model) (tea.Model, tea.Cmd) {
 		switch key {
 		case "up", "ctrl+k":
-			if m.currIndex < len(m.list)-1 {
+			if m.currIndex < len(m.lm.List())-1 {
 				m.currIndex++
 			}
 		case "down", "ctrl+j":
@@ -66,18 +66,6 @@ var enterEvent = &Event{
 		} else {
 			m.ShowMenu = true
 			m.FreshList()
-		}
-		return m, nil
-	},
-}
-
-var moveMenuEvent = &Event{
-	Keys: []string{"left", "right"},
-	Cb: func(key string, m *Model) (tea.Model, tea.Cmd) {
-		if m.ShowMenu {
-			m.menuCtl(key)
-		} else {
-			m.inputCtl(key)
 		}
 		return m, nil
 	},

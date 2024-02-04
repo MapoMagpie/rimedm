@@ -1,6 +1,7 @@
 package dict
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -19,21 +20,25 @@ func TestDictionary_Search(t *testing.T) {
 		},
 	}
 	fes2 := LoadItems("../rime/xkjd/xkjd6.dict.yaml")
+	fmt.Println(len(fes2))
 	tests := []struct {
 		name string
 		args args
 	}{
+		{"3", args{[]rune("wor"), []*FileEntries{fes1}}},
 		{"1", args{[]rune("hel"), []*FileEntries{fes1}}},
-		{"1", args{[]rune("你"), []*FileEntries{fes1}}},
+		{"2", args{[]rune("你"), []*FileEntries{fes1}}},
 		{"load", args{[]rune("hmxa"), fes2}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dict := NewDictionary(tt.args.fes, &CacheMatcher{})
-			matched := dict.Search(tt.args.key)
-			for _, entry := range matched {
-				fmt.Println(entry)
-				//fmt.Println("matched >>", matched)
+			ctx := context.Background()
+			ch := make(chan []*MatchResult)
+			fmt.Println("searching for", string(tt.args.key))
+			go dict.Search(tt.args.key, ch, ctx)
+			for ret := range ch {
+				fmt.Println(ret)
 			}
 		})
 	}

@@ -8,10 +8,6 @@ import (
 )
 
 func exportDict(path string, fes []*FileEntries) {
-	// sort fes by file name
-	sort.Slice(fes, func(i, j int) bool {
-		return fes[i].FilePath < fes[j].FilePath
-	})
 	file, err := os.Create(path)
 	if err != nil {
 		panic(err)

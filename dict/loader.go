@@ -17,10 +17,15 @@ type FileEntries struct {
 	RawBs    []byte
 	Entries  []*Entry
 	Err      error
+	order    int
 }
 
 func (fe *FileEntries) String() string {
 	return fe.FilePath
+}
+
+func (fe *FileEntries) Order() int {
+	return fe.order
 }
 
 func LoadItems(path string) (fes []*FileEntries) {
@@ -29,7 +34,7 @@ func LoadItems(path string) (fes []*FileEntries) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		loadFromFile(path, ch, &wg)
+		loadFromFile(path, 0, ch, &wg)
 	}()
 	go func() {
 		wg.Wait()
@@ -49,9 +54,9 @@ var (
 	YamlEnd   = []byte{'.', '.', '.'}
 )
 
-func loadFromFile(path string, ch chan<- *FileEntries, wg *sync.WaitGroup) {
+func loadFromFile(path string, order int, ch chan<- *FileEntries, wg *sync.WaitGroup) {
 	defer wg.Done()
-	fe := &FileEntries{FilePath: path, Entries: make([]*Entry, 0)}
+	fe := &FileEntries{FilePath: path, Entries: make([]*Entry, 0), order: order}
 	file, err := os.OpenFile(path, os.O_RDONLY, 0666)
 	if fe.Err = err; err != nil {
 		ch <- fe
@@ -88,7 +93,7 @@ func loadFromFile(path string, ch chan<- *FileEntries, wg *sync.WaitGroup) {
 				duringYaml = 1
 				continue
 			} else if bytes.Equal(bytes.TrimSpace(bs), YamlEnd) {
-				loadExtendDict(path, yamlContent, ch, wg)
+				loadExtendDict(path, order*10, yamlContent, ch, wg)
 				duringYaml = 0
 				continue
 			}
@@ -109,21 +114,21 @@ func loadFromFile(path string, ch chan<- *FileEntries, wg *sync.WaitGroup) {
 		}
 	}
 	if duringYaml == 1 && len(yamlContent) > 0 {
-		loadExtendDict(path, yamlContent, ch, wg)
+		loadExtendDict(path, order*10, yamlContent, ch, wg)
 	}
 	ch <- fe
 }
 
-func loadExtendDict(path string, yamlContent []byte, ch chan<- *FileEntries, wg *sync.WaitGroup) {
+func loadExtendDict(path string, order int, yamlContent []byte, ch chan<- *FileEntries, wg *sync.WaitGroup) {
 	paths, err := parseExtendPaths(path, yamlContent)
 	if err != nil {
 		log.Fatalf("parse [%s] yaml error: %s", path, err)
 	}
 	wg.Add(len(paths))
-	for _, extendPath := range paths {
-		go func(newPath string) {
-			loadFromFile(newPath, ch, wg)
-		}(extendPath)
+	for i, extendPath := range paths {
+		go func(newPath string, order int) {
+			loadFromFile(newPath, order, ch, wg)
+		}(extendPath, order+i)
 	}
 }
 

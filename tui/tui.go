@@ -3,15 +3,26 @@ package tui
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/term"
 )
 
+type ExitMenuMsg int
+
+func ExitMenuCmd() tea.Msg {
+	return ExitMenuMsg(1)
+}
+
+type FreshListMsg int
+
 type ItemRender interface {
 	String() string
+	Order() int
 }
 
 type Menu struct {
@@ -19,26 +30,60 @@ type Menu struct {
 	Cb   func(m *Model) tea.Cmd // Callback
 }
 
+type ListManager struct {
+	list       []ItemRender
+	SearchChan chan<- string
+	currIndex  int
+	inputs     []string
+	setVer     int
+	getVer     int
+}
+
+func (l *ListManager) List() []ItemRender {
+	list := l.list
+	if l.getVer != l.setVer {
+		sort.Slice(list, func(i, j int) bool {
+			r := list[i].Order() - list[j].Order()
+			return r > 0
+		})
+		l.getVer = l.setVer
+	}
+	return list
+}
+
+func (l *ListManager) Curr() (ItemRender, error) {
+	if len(l.list) == 0 {
+		return nil, errors.New("empty list")
+	}
+	return l.list[l.currIndex], nil
+}
+
+func (l *ListManager) newSearch(inputs []string) {
+	l.list = make([]ItemRender, 0)
+	l.SearchChan <- strings.Join(inputs, "")
+}
+
+func (l *ListManager) AppendList(rs []ItemRender) {
+	l.setVer++
+	l.list = append(l.list, rs...)
+	log.Printf("list manager append: %v", len(l.List()))
+}
+
 type Model struct {
 	currIndex    int
-	listFetcher  func(m *Model) []ItemRender
-	list         []ItemRender
+	lm           *ListManager
 	ShowMenu     bool
 	menuFetcher  func() []*Menu
 	MenuIndex    int
 	wx           int // terminal width
 	hx           int // terminal height
-	key          string
 	InputCursor  int
 	Inputs       []string
 	eventManager *EventManager
 }
 
 func (m *Model) CurrItem() (ItemRender, error) {
-	if len(m.list) == 0 {
-		return nil, errors.New("empty list")
-	}
-	return m.list[m.currIndex], nil
+	return m.lm.Curr()
 }
 
 func (m *Model) CurrMenu() *Menu {
@@ -47,6 +92,10 @@ func (m *Model) CurrMenu() *Menu {
 		return menus[m.MenuIndex]
 	}
 	return nil
+}
+
+func (m *Model) FreshList() {
+	m.lm.newSearch(m.Inputs)
 }
 
 //var asciiPattern, _ = regexp.Compile("^[a-zA-z\\d]$")
@@ -67,7 +116,6 @@ func (m *Model) inputCtl(key string) {
 		if m.InputCursor < len(m.Inputs) {
 			m.InputCursor++
 		}
-	case "enter": // do nothing
 	default:
 		if key == "tab" {
 			key = "\t"
@@ -104,16 +152,7 @@ func (m *Model) menuCtl(key string) {
 			}
 		}
 	}
-	m.FreshList()
-}
-
-func (m *Model) FreshList() {
-	m.list = m.listFetcher(m)
-	if ln := len(m.list); ln == 0 {
-		m.currIndex = 0
-	} else if m.currIndex >= ln {
-		m.currIndex = len(m.list) - 1
-	}
+	// m.FreshList()
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -128,7 +167,8 @@ func (m *Model) View() string {
 	sb.WriteString(line + "\n")
 	renderCnt := m.hx - 5 // 5 is header lines(1) + footer lines(4)
 	// body
-	le := len(m.list)
+	list := m.lm.List()
+	le := len(list)
 	if remain := renderCnt - le; remain > 0 {
 		sb.WriteString(strings.Repeat("\n", remain))
 	}
@@ -141,9 +181,9 @@ func (m *Model) View() string {
 	}
 	for i := start; i >= end; i-- {
 		if i == m.currIndex {
-			sb.WriteString(fmt.Sprintf("\x1b[31m>\x1b[0m \x1b[1;4;35m\x1b[47m%3d: %s\x1b[0m\n", i+1, m.list[i].String()))
+			sb.WriteString(fmt.Sprintf("\x1b[31m>\x1b[0m \x1b[1;4;35m\x1b[47m%3d: %s\x1b[0m\n", i+1, list[i].String()))
 		} else {
-			sb.WriteString(fmt.Sprintf("> %3d: %s\n", i+1, m.list[i].String()))
+			sb.WriteString(fmt.Sprintf("> %3d: %s\n", i+1, list[i].String()))
 		}
 	}
 	//footer
@@ -170,8 +210,6 @@ func (m *Model) View() string {
 	return s
 }
 
-type ExitMenuMsg int
-
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -179,40 +217,32 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		event := m.eventManager.Find(strings.ToLower(key))
 		if event != nil {
 			return event.Cb(key, m)
-		} else {
-			if m.ShowMenu {
-				m.menuCtl(key)
-			} else {
-				m.inputCtl(key)
-			}
 		}
-		m.key = key
+		if m.ShowMenu {
+			m.menuCtl(key)
+		} else { // search
+			m.inputCtl(key)
+		}
 	case ExitMenuMsg:
 		m.ShowMenu = false
 		m.FreshList()
 	case tea.WindowSizeMsg:
 		m.wx = msg.Width
 		m.hx = msg.Height
+		// case FreshListMsg:
+		// 	log.Printf("FreshListMsg")
 	}
 	return m, nil
 }
 
-func NewModel(listFetcher func(m *Model) []ItemRender, menuFetcher func() []*Menu, events ...*Event) *Model {
+func NewModel(lm *ListManager, menuFetcher func() []*Menu, events ...*Event) *Model {
 	fd := os.Stderr.Fd()
 	wx, hx, err := term.GetSize(int(fd))
 	if err != nil {
 		fmt.Printf("Terminal GetSize Error: %v\n", err)
 		os.Exit(1)
 	}
-	em := NewEventManager(moveEvent, enterEvent, moveMenuEvent, clearInputEvent)
+	em := NewEventManager(moveEvent, enterEvent, clearInputEvent)
 	em.Add(events...)
-	return &Model{listFetcher: listFetcher, wx: wx, hx: hx, menuFetcher: menuFetcher, eventManager: em}
-}
-
-func Start(m tea.Model) {
-	p := tea.NewProgram(m)
-	if err := p.Start(); err != nil {
-		fmt.Printf("Tui Program Error: %v\n", err)
-		os.Exit(1)
-	}
+	return &Model{lm: lm, wx: wx, hx: hx, menuFetcher: menuFetcher, eventManager: em}
 }

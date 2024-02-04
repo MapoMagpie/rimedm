@@ -2,9 +2,11 @@ package dict
 
 import (
 	"bytes"
-	"github.com/junegunn/fzf/src/util"
+	"context"
 	"log"
 	"time"
+
+	"github.com/junegunn/fzf/src/util"
 )
 
 type Dictionary struct {
@@ -30,11 +32,18 @@ func (d *Dictionary) Entries() []*Entry {
 	return entries
 }
 
-func (d *Dictionary) Search(key []rune) []*Entry {
+func (d *Dictionary) Search(key []rune, resultChan chan<- []*MatchResult, ctx context.Context) {
+	// defer close(resultChan)
 	if len(key) == 0 {
-		return d.Entries()
+		list := d.Entries()
+		ret := make([]*MatchResult, len(list))
+		for i, entry := range list {
+			ret[i] = &MatchResult{Entry: entry}
+		}
+		resultChan <- ret
+	} else {
+		d.matcher.Search(key, d.Entries(), resultChan, ctx)
 	}
-	return d.matcher.Search(key, d.Entries())
 }
 
 func (d *Dictionary) Add(entry *Entry) {
