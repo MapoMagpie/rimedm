@@ -17,7 +17,7 @@ func Test_loadItems(t *testing.T) {
 		{"1", args{"../rime/xkjd/xkjd6.dict.yaml"}},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			start := time.Now()
 			fes := LoadItems(tt.args.path)
 			duration1 := time.Since(start)

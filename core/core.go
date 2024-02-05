@@ -1,15 +1,16 @@
-package main
+package core
 
 import (
 	"context"
 	"fmt"
 	"log"
 	"os"
-	"rimedictmanager/dict"
-	"rimedictmanager/tui"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/MapoMagpie/rimedm/dict"
+	"github.com/MapoMagpie/rimedm/tui"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/junegunn/fzf/src/util"
@@ -40,7 +41,7 @@ func Start(opts *Options) {
 	}
 
 	// 添加菜单
-	var menuNameAdd = tui.Menu{Name: "Add", Cb: func(m *tui.Model) (cmd tea.Cmd) {
+	menuNameAdd := tui.Menu{Name: "Add", Cb: func(m *tui.Model) (cmd tea.Cmd) {
 		if len(m.Inputs) > 0 {
 			raw := strings.TrimSpace(strings.Join(m.Inputs, ""))
 			if raw == "" {
@@ -58,14 +59,13 @@ func Start(opts *Options) {
 				m.Inputs = []string{}
 				m.InputCursor = 0
 				sync(opts, dc, opts.SyncOnChange)
-			} else {
 			}
 		}
 		return tui.ExitMenuCmd
 	}}
 
 	// 删除菜单
-	var menuNameDelete = tui.Menu{Name: "Delete", Cb: func(m *tui.Model) (cmd tea.Cmd) {
+	menuNameDelete := tui.Menu{Name: "Delete", Cb: func(m *tui.Model) (cmd tea.Cmd) {
 		item, err := m.CurrItem()
 		if err != nil {
 			return
@@ -80,9 +80,9 @@ func Start(opts *Options) {
 	}}
 
 	// 修改菜单
-	var modifying = false
+	modifying := false
 	var modifyingItem tui.ItemRender
-	var menuNameModify = tui.Menu{Name: "Modify", Cb: func(m *tui.Model) (cmd tea.Cmd) {
+	menuNameModify := tui.Menu{Name: "Modify", Cb: func(m *tui.Model) (cmd tea.Cmd) {
 		modifying = true
 		item, err := m.CurrItem()
 		if err != nil {
@@ -96,7 +96,7 @@ func Start(opts *Options) {
 	}}
 
 	// 确认修改菜单
-	var menuNameConfirm = tui.Menu{Name: "Confirm", Cb: func(m *tui.Model) tea.Cmd {
+	menuNameConfirm := tui.Menu{Name: "Confirm", Cb: func(m *tui.Model) tea.Cmd {
 		str := strings.Join(m.Inputs, "")
 		log.Printf("modify confirm str: %s\n", str)
 		switch item := modifyingItem.(type) {
@@ -110,18 +110,17 @@ func Start(opts *Options) {
 		return tui.ExitMenuCmd
 	}}
 
-	var menuGroup1 = []*tui.Menu{&menuNameAdd, &menuNameDelete, &menuNameModify}
-	var menuGroup2 = []*tui.Menu{&menuNameConfirm}
-	var menuFetcher = func() []*tui.Menu {
+	menuGroup1 := []*tui.Menu{&menuNameAdd, &menuNameDelete, &menuNameModify}
+	menuGroup2 := []*tui.Menu{&menuNameConfirm}
+	menuFetcher := func() []*tui.Menu {
 		if modifying {
 			return menuGroup2
 		}
 		return menuGroup1
-
 	}
 
 	exitEvent := &tui.Event{
-		Keys: []string{"esc", "ctrl+c"},
+		Keys: []string{"esc", "ctrl+c", "ctrl+d"},
 		Cb: func(key string, m *tui.Model) (tea.Model, tea.Cmd) {
 			if m.ShowMenu && key == "esc" {
 				m.ShowMenu = false
@@ -136,7 +135,7 @@ func Start(opts *Options) {
 	// 简单地合并码表并输出到当前目录中
 	exportDictEvent := &tui.Event{
 		Keys: []string{"ctrl+o"},
-		Cb: func(key string, m *tui.Model) (tea.Model, tea.Cmd) {
+		Cb: func(_ string, m *tui.Model) (tea.Model, tea.Cmd) {
 			filePath := "output.txt"
 			dc.ExportDict(filePath)
 			return m, nil
@@ -144,8 +143,8 @@ func Start(opts *Options) {
 	}
 
 	searchChan := make(chan string)
-	listManager := tui.ListManager{SearchChan: searchChan}
-	model := tui.NewModel(&listManager, menuFetcher, exitEvent, exportDictEvent)
+	listManager := tui.NewListManager(searchChan)
+	model := tui.NewModel(listManager, menuFetcher, tui.MoveEvent, tui.EnterEvent, tui.ClearInputEvent, exitEvent, exportDictEvent)
 	teaProgram := tea.NewProgram(model)
 
 	go func() {
@@ -159,6 +158,7 @@ func Start(opts *Options) {
 					teaProgram.Send(tui.FreshListMsg(0))
 					continue
 				}
+				log.Println("searching: ", raw)
 				ch = make(chan []*dict.MatchResult)
 				ctx, cancel := context.WithCancel(context.Background())
 				if cancelFunc != nil {
@@ -168,6 +168,7 @@ func Start(opts *Options) {
 				rs := []rune(raw)
 				if len(raw) > 0 {
 					pair := dict.ParseInput(raw)
+					// log.Printf("pair: %v\n", pair)
 					if pair[1] != "" {
 						rs = []rune(pair[1])
 					}
@@ -179,7 +180,6 @@ func Start(opts *Options) {
 					for i, entry := range ret {
 						list[i] = entry
 					}
-					log.Println("recv list: ", len(list))
 					listManager.AppendList(list)
 					teaProgram.Send(tui.FreshListMsg(0))
 				}

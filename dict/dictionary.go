@@ -33,11 +33,18 @@ func (d *Dictionary) Entries() []*Entry {
 }
 
 func (d *Dictionary) Search(key []rune, resultChan chan<- []*MatchResult, ctx context.Context) {
-	// defer close(resultChan)
 	if len(key) == 0 {
+		done := false
+		go func() {
+			<-ctx.Done()
+			done = true
+		}()
 		list := d.Entries()
 		ret := make([]*MatchResult, len(list))
 		for i, entry := range list {
+			if done {
+				return
+			}
 			ret[i] = &MatchResult{Entry: entry}
 		}
 		resultChan <- ret
@@ -95,11 +102,11 @@ const (
 )
 
 type Entry struct {
-	text    util.Chars
-	Pair    [][]byte // 0 汉字 1 code 3 权重
 	refFile string
+	Pair    [][]byte
+	text    util.Chars
 	seek    int64
-	rawSize int64 // 原始大小，不可变，用于重写文件时计算偏移量
+	rawSize int64
 	modType ModifyType
 	log     bool
 }
@@ -123,7 +130,7 @@ func (e *Entry) IsDelete() bool {
 }
 
 func (e *Entry) String() string {
-	//return e.text.ToString() + "\t" + e.refFile
+	// return e.text.ToString() + "\t" + e.refFile
 	return e.text.ToString()
 }
 
@@ -183,7 +190,7 @@ func ParseInput(raw string) [3]string {
 }
 
 func isAscii(str string) bool {
-	for _, r := range []rune(str) {
+	for _, r := range str {
 		if r >= 0x80 {
 			return false
 		}

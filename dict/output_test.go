@@ -8,8 +8,8 @@ import (
 func Test_writeLine(t *testing.T) {
 	tests := []struct {
 		name  string
-		entry Entry
 		want  []byte
+		entry Entry
 	}{
 		{
 			name:  "1",
@@ -55,7 +55,7 @@ func Test_outputFile(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			outputFile(tt.args.fe.RawBs, tt.args.fe.FilePath, tt.args.entries)
 		})
 	}

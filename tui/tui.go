@@ -7,6 +7,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/term"
@@ -26,20 +27,26 @@ type ItemRender interface {
 }
 
 type Menu struct {
+	Cb   func(m *Model) tea.Cmd
 	Name string
-	Cb   func(m *Model) tea.Cmd // Callback
 }
 
 type ListManager struct {
-	list       []ItemRender
 	SearchChan chan<- string
+	list       []ItemRender
 	currIndex  int
-	inputs     []string
 	setVer     int
 	getVer     int
+	lock       sync.Mutex
+}
+
+func NewListManager(searchChan chan<- string) *ListManager {
+	return &ListManager{SearchChan: searchChan, lock: sync.Mutex{}}
 }
 
 func (l *ListManager) List() []ItemRender {
+	l.lock.Lock()
+	defer l.lock.Unlock()
 	list := l.list
 	if l.getVer != l.setVer {
 		sort.Slice(list, func(i, j int) bool {
@@ -59,27 +66,29 @@ func (l *ListManager) Curr() (ItemRender, error) {
 }
 
 func (l *ListManager) newSearch(inputs []string) {
+	l.lock.Lock()
 	l.list = make([]ItemRender, 0)
 	l.SearchChan <- strings.Join(inputs, "")
+	l.lock.Unlock()
 }
 
 func (l *ListManager) AppendList(rs []ItemRender) {
+	l.lock.Lock()
 	l.setVer++
 	l.list = append(l.list, rs...)
-	log.Printf("list manager append: %v", len(l.List()))
+	l.lock.Unlock()
 }
 
 type Model struct {
-	currIndex    int
 	lm           *ListManager
-	ShowMenu     bool
 	menuFetcher  func() []*Menu
-	MenuIndex    int
-	wx           int // terminal width
-	hx           int // terminal height
-	InputCursor  int
-	Inputs       []string
 	eventManager *EventManager
+	Inputs       []string
+	MenuIndex    int
+	wx           int
+	hx           int
+	InputCursor  int
+	ShowMenu     bool
 }
 
 func (m *Model) CurrItem() (ItemRender, error) {
@@ -98,8 +107,7 @@ func (m *Model) FreshList() {
 	m.lm.newSearch(m.Inputs)
 }
 
-//var asciiPattern, _ = regexp.Compile("^[a-zA-z\\d]$")
-
+// var asciiPattern, _ = regexp.Compile("^[a-zA-z\\d]$")
 func (m *Model) inputCtl(key string) {
 	switch strings.ToLower(key) {
 	case "backspace":
@@ -176,17 +184,17 @@ func (m *Model) View() string {
 		renderCnt = le
 	}
 	start, end := renderCnt-1, 0
-	if m.currIndex > renderCnt-1 {
-		start, end = m.currIndex, m.currIndex-renderCnt+1
+	if m.lm.currIndex > renderCnt-1 {
+		start, end = m.lm.currIndex, m.lm.currIndex-renderCnt+1
 	}
 	for i := start; i >= end; i-- {
-		if i == m.currIndex {
+		if i == m.lm.currIndex {
 			sb.WriteString(fmt.Sprintf("\x1b[31m>\x1b[0m \x1b[1;4;35m\x1b[47m%3d: %s\x1b[0m\n", i+1, list[i].String()))
 		} else {
 			sb.WriteString(fmt.Sprintf("> %3d: %s\n", i+1, list[i].String()))
 		}
 	}
-	//footer
+	// footer
 	sb.WriteString(fmt.Sprintf("Total: %d\n", le))
 	sb.WriteString("Press[Enter:Menu][Ctrl+X:Clear Input][Ctrl+C|ESC:Quit][Ctrl+O:Export Dict]\n")
 	sb.WriteString(line + "\n")
@@ -229,8 +237,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.wx = msg.Width
 		m.hx = msg.Height
-		// case FreshListMsg:
-		// 	log.Printf("FreshListMsg")
+	case FreshListMsg:
+		log.Printf("FreshListMsg")
 	}
 	return m, nil
 }
@@ -242,7 +250,5 @@ func NewModel(lm *ListManager, menuFetcher func() []*Menu, events ...*Event) *Mo
 		fmt.Printf("Terminal GetSize Error: %v\n", err)
 		os.Exit(1)
 	}
-	em := NewEventManager(moveEvent, enterEvent, clearInputEvent)
-	em.Add(events...)
-	return &Model{lm: lm, wx: wx, hx: hx, menuFetcher: menuFetcher, eventManager: em}
+	return &Model{lm: lm, wx: wx, hx: hx, menuFetcher: menuFetcher, eventManager: NewEventManager(events...)}
 }

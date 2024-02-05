@@ -25,30 +25,30 @@ func (e *EventManager) Add(events ...*Event) {
 }
 
 type Event struct {
-	Keys []string
 	Cb   func(key string, m *Model) (tea.Model, tea.Cmd)
+	Keys []string
 }
 
-var moveEvent = &Event{
+var MoveEvent = &Event{
 	Keys: []string{"up", "ctrl+j", "down", "ctrl+k"},
 	Cb: func(key string, m *Model) (tea.Model, tea.Cmd) {
 		switch key {
 		case "up", "ctrl+k":
-			if m.currIndex < len(m.lm.List())-1 {
-				m.currIndex++
+			if m.lm.currIndex < len(m.lm.List())-1 {
+				m.lm.currIndex++
 			}
 		case "down", "ctrl+j":
-			if m.currIndex > 0 {
-				m.currIndex--
+			if m.lm.currIndex > 0 {
+				m.lm.currIndex--
 			}
 		}
 		return m, nil
 	},
 }
 
-var clearInputEvent = &Event{
+var ClearInputEvent = &Event{
 	Keys: []string{"ctrl+x"},
-	Cb: func(key string, m *Model) (tea.Model, tea.Cmd) {
+	Cb: func(_ string, m *Model) (tea.Model, tea.Cmd) {
 		m.Inputs = []string{}
 		m.InputCursor = 0
 		m.FreshList()
@@ -56,9 +56,9 @@ var clearInputEvent = &Event{
 	},
 }
 
-var enterEvent = &Event{
+var EnterEvent = &Event{
 	Keys: []string{"enter"},
-	Cb: func(key string, m *Model) (tea.Model, tea.Cmd) {
+	Cb: func(_ string, m *Model) (tea.Model, tea.Cmd) {
 		if menus := m.menuFetcher(); m.ShowMenu && len(menus) > 0 {
 			if menu := menus[m.MenuIndex]; menu.Cb != nil {
 				return m, menu.Cb(m)

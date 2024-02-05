@@ -31,7 +31,7 @@ func TestDictionary_Search(t *testing.T) {
 		{"load", args{[]rune("hmxa"), fes2}},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			dict := NewDictionary(tt.args.fes, &CacheMatcher{})
 			ctx := context.Background()
 			ch := make(chan []*MatchResult)

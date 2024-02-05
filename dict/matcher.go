@@ -2,6 +2,7 @@ package dict
 
 import (
 	"context"
+	"log"
 
 	"github.com/junegunn/fzf/src/algo"
 	"github.com/junegunn/fzf/src/util"
@@ -18,7 +19,7 @@ func (m *MatchResult) String() string {
 
 func (m *MatchResult) Order() int {
 	score := m.result.Score
-	score = score * m.Entry.text.Length()
+	score = score * (200 - m.Entry.text.Length())
 	return score
 }
 
@@ -63,6 +64,7 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*Ma
 	var done bool
 	go func() {
 		<-ctx.Done()
+		log.Println("ctx done")
 		done = true
 	}()
 
@@ -75,28 +77,32 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*Ma
 			continue
 		}
 		result, _ := algo.FuzzyMatchV2(false, true, true, &entry.text, key, false, slab)
+		if done {
+			return
+		}
 		if result.Score > 0 {
 			matched = append(matched, MatchResult{entry, result})
 		}
-		if idx%CHUNK_SIZE == 0 || done || idx == listLen-1 {
+		if idx%CHUNK_SIZE == 0 || idx == listLen-1 {
 			m2 := matched[lastIdx:]
 			if len(m2) > 0 {
 				ret := make([]*MatchResult, len(m2))
-				for i, m := range m2 {
-					ret[i] = &m
+				// why ret elements alaways same?
+				// for i, m := range m2 {
+				//   ret[i] = &m
+				// }
+				for i := 0; i < len(m2); i++ {
+					ret[i] = &m2[i]
 				}
 				resultChan <- ret
 				lastIdx = len(matched)
 			}
 		}
-		if done {
-			return
-		}
 	}
 
 	cache = make([]*MatchResult, len(matched))
-	for i, m := range matched {
-		cache[i] = &m
+	for i := 0; i < len(matched); i++ {
+		cache[i] = &matched[i]
 	}
 	if m.cache == nil {
 		m.cache = make(map[string][]*MatchResult)

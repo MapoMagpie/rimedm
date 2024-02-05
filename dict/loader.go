@@ -3,20 +3,21 @@ package dict
 import (
 	"bytes"
 	"fmt"
-	"github.com/goccy/go-yaml"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sync"
+
+	"github.com/goccy/go-yaml"
 )
 
 type FileEntries struct {
+	Err      error
 	FilePath string
 	RawBs    []byte
 	Entries  []*Entry
-	Err      error
 	order    int
 }
 

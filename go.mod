@@ -1,6 +1,6 @@
-module rimedictmanager
+module github.com/MapoMagpie/rimedm
 
-go 1.18
+go 1.21.6
 
 require (
 	github.com/charmbracelet/bubbletea v0.25.0
