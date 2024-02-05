@@ -32,14 +32,20 @@ type Event struct {
 var MoveEvent = &Event{
 	Keys: []string{"up", "ctrl+j", "down", "ctrl+k"},
 	Cb: func(key string, m *Model) (tea.Model, tea.Cmd) {
+		list := m.lm.List()
+		currIndex := &m.lm.currIndex
+		if m.ShowMenu && m.CurrMenu().Name == "Add" {
+			list = m.lm.files
+			currIndex = &m.lm.fileIndex
+		}
 		switch key {
 		case "up", "ctrl+k":
-			if m.lm.currIndex < len(m.lm.List())-1 {
-				m.lm.currIndex++
+			if *currIndex < len(list)-1 {
+				*currIndex++
 			}
 		case "down", "ctrl+j":
-			if m.lm.currIndex > 0 {
-				m.lm.currIndex--
+			if *currIndex > 0 {
+				*currIndex--
 			}
 		}
 		return m, nil
@@ -59,13 +65,12 @@ var ClearInputEvent = &Event{
 var EnterEvent = &Event{
 	Keys: []string{"enter"},
 	Cb: func(_ string, m *Model) (tea.Model, tea.Cmd) {
-		if menus := m.menuFetcher(); m.ShowMenu && len(menus) > 0 {
+		if menus := m.menuFetcher(m.Modifying); m.ShowMenu && len(menus) > 0 {
 			if menu := menus[m.MenuIndex]; menu.Cb != nil {
 				return m, menu.Cb(m)
 			}
 		} else {
 			m.ShowMenu = true
-			m.FreshList()
 		}
 		return m, nil
 	},

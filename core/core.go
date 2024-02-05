@@ -37,28 +37,32 @@ func Start(opts *Options) {
 		fileNames = append(fileNames, &dict.FileEntries{FilePath: opts.UserPath})
 	}
 	for _, f := range dc.Files() {
+		if f.FilePath == opts.UserPath {
+			continue
+		}
 		fileNames = append(fileNames, f)
 	}
 
 	// 添加菜单
 	menuNameAdd := tui.Menu{Name: "Add", Cb: func(m *tui.Model) (cmd tea.Cmd) {
 		if len(m.Inputs) > 0 {
+			file, err := m.CurrFile()
+			if err != nil {
+				log.Fatalf("add to dict error: %v", err)
+				return
+			}
 			raw := strings.TrimSpace(strings.Join(m.Inputs, ""))
 			if raw == "" {
 				return
 			}
-			item, err := m.CurrItem() // file name
-			if err != nil {
-				return
-			}
 			pair := dict.ParseInput(raw)
 			if pair[1] != "" {
-				filePath := item.String()
+				filePath := file.String()
 				dc.ResetMatcher()
 				dc.Add(dict.NewEntryAdd([]byte(strings.Join(pair[:], "\t")), filePath))
 				m.Inputs = []string{}
 				m.InputCursor = 0
-				sync(opts, dc, opts.SyncOnChange)
+				FlushAndSync(opts, dc, opts.SyncOnChange)
 			}
 		}
 		return tui.ExitMenuCmd
@@ -74,16 +78,15 @@ func Start(opts *Options) {
 		case *dict.MatchResult:
 			dc.ResetMatcher()
 			dc.Delete(item.Entry)
-			sync(opts, dc, opts.SyncOnChange)
+			FlushAndSync(opts, dc, opts.SyncOnChange)
 		}
 		return tui.ExitMenuCmd
 	}}
 
 	// 修改菜单
-	modifying := false
 	var modifyingItem tui.ItemRender
 	menuNameModify := tui.Menu{Name: "Modify", Cb: func(m *tui.Model) (cmd tea.Cmd) {
-		modifying = true
+		m.Modifying = true
 		item, err := m.CurrItem()
 		if err != nil {
 			return
@@ -97,6 +100,7 @@ func Start(opts *Options) {
 
 	// 确认修改菜单
 	menuNameConfirm := tui.Menu{Name: "Confirm", Cb: func(m *tui.Model) tea.Cmd {
+		m.Modifying = false
 		str := strings.Join(m.Inputs, "")
 		log.Printf("modify confirm str: %s\n", str)
 		switch item := modifyingItem.(type) {
@@ -104,30 +108,33 @@ func Start(opts *Options) {
 			log.Printf("modify confirm item: %s\n", item)
 			dc.ResetMatcher()
 			item.Entry.ReRaw([]byte(str))
-			sync(opts, dc, opts.SyncOnChange)
+			FlushAndSync(opts, dc, opts.SyncOnChange)
 		}
-		modifying = false
 		return tui.ExitMenuCmd
 	}}
 
-	menuGroup1 := []*tui.Menu{&menuNameAdd, &menuNameDelete, &menuNameModify}
-	menuGroup2 := []*tui.Menu{&menuNameConfirm}
-	menuFetcher := func() []*tui.Menu {
+	menuFetcher := func(modifying bool) []*tui.Menu {
 		if modifying {
-			return menuGroup2
+			return []*tui.Menu{&menuNameConfirm}
+		} else {
+			return []*tui.Menu{&menuNameAdd, &menuNameDelete, &menuNameModify}
 		}
-		return menuGroup1
 	}
 
 	exitEvent := &tui.Event{
 		Keys: []string{"esc", "ctrl+c", "ctrl+d"},
 		Cb: func(key string, m *tui.Model) (tea.Model, tea.Cmd) {
-			if m.ShowMenu && key == "esc" {
-				m.ShowMenu = false
-				return m, nil
-			} else {
-				sync(opts, dc, !opts.SyncOnChange)
+			if key == "esc" {
+				if m.ShowMenu {
+					m.ShowMenu = false
+					return m, nil
+				}
+				if m.Modifying {
+					m.Modifying = false
+					return m, nil
+				}
 			}
+			FlushAndSync(opts, dc, !opts.SyncOnChange)
 			return m, tea.Quit
 		},
 	}
@@ -142,24 +149,20 @@ func Start(opts *Options) {
 		},
 	}
 
-	searchChan := make(chan string)
+	searchChan := make(chan string, 10)
 	listManager := tui.NewListManager(searchChan)
+	listManager.SetFiles(fileNames)
 	model := tui.NewModel(listManager, menuFetcher, tui.MoveEvent, tui.EnterEvent, tui.ClearInputEvent, exitEvent, exportDictEvent)
 	teaProgram := tea.NewProgram(model)
 
 	go func() {
 		var cancelFunc context.CancelFunc
 		ch := make(chan []*dict.MatchResult)
+		timer := time.NewTicker(time.Millisecond * 20)
+		hasAppend := false
 		for {
 			select {
 			case raw := <-searchChan:
-				if model.ShowMenu && model.CurrMenu().Name == "Add" {
-					listManager.AppendList(fileNames)
-					teaProgram.Send(tui.FreshListMsg(0))
-					continue
-				}
-				log.Println("searching: ", raw)
-				ch = make(chan []*dict.MatchResult)
 				ctx, cancel := context.WithCancel(context.Background())
 				if cancelFunc != nil {
 					cancelFunc()
@@ -181,6 +184,12 @@ func Start(opts *Options) {
 						list[i] = entry
 					}
 					listManager.AppendList(list)
+					hasAppend = true
+				}
+			case <-timer.C:
+				if hasAppend {
+					hasAppend = false
+					log.Printf("timer.C")
 					teaProgram.Send(tui.FreshListMsg(0))
 				}
 			}
@@ -193,7 +202,7 @@ func Start(opts *Options) {
 	}
 }
 
-func sync(opts *Options, dc *dict.Dictionary, ok bool) {
+func FlushAndSync(opts *Options, dc *dict.Dictionary, ok bool) {
 	if !ok {
 		return
 	}

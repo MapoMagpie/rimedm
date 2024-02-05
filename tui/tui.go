@@ -34,7 +34,9 @@ type Menu struct {
 type ListManager struct {
 	SearchChan chan<- string
 	list       []ItemRender
+	files      []ItemRender
 	currIndex  int
+	fileIndex  int
 	setVer     int
 	getVer     int
 	lock       sync.Mutex
@@ -45,30 +47,43 @@ func NewListManager(searchChan chan<- string) *ListManager {
 }
 
 func (l *ListManager) List() []ItemRender {
-	l.lock.Lock()
-	defer l.lock.Unlock()
 	list := l.list
+	le := len(list)
+	if le == 0 {
+		l.currIndex = 0
+	} else if l.currIndex > le-1 {
+		l.currIndex = le - 1
+	}
 	if l.getVer != l.setVer {
+		l.lock.Lock()
 		sort.Slice(list, func(i, j int) bool {
-			r := list[i].Order() - list[j].Order()
-			return r > 0
+			return list[i].Order()-list[j].Order() > 0
 		})
 		l.getVer = l.setVer
+		l.lock.Unlock()
 	}
 	return list
+}
+
+func (l *ListManager) Files() []ItemRender {
+	return l.files
 }
 
 func (l *ListManager) Curr() (ItemRender, error) {
 	if len(l.list) == 0 {
 		return nil, errors.New("empty list")
+	} else {
+		return l.list[l.currIndex], nil
 	}
-	return l.list[l.currIndex], nil
 }
 
 func (l *ListManager) newSearch(inputs []string) {
 	l.lock.Lock()
 	l.list = make([]ItemRender, 0)
+	// l.currIndex = 0
+	log.Printf("send search key: %v\n", strings.Join(inputs, ""))
 	l.SearchChan <- strings.Join(inputs, "")
+	log.Printf("send search key: finshed\n")
 	l.lock.Unlock()
 }
 
@@ -79,9 +94,13 @@ func (l *ListManager) AppendList(rs []ItemRender) {
 	l.lock.Unlock()
 }
 
+func (l *ListManager) SetFiles(files []ItemRender) {
+	l.files = files
+}
+
 type Model struct {
 	lm           *ListManager
-	menuFetcher  func() []*Menu
+	menuFetcher  func(bool) []*Menu
 	eventManager *EventManager
 	Inputs       []string
 	MenuIndex    int
@@ -89,14 +108,26 @@ type Model struct {
 	hx           int
 	InputCursor  int
 	ShowMenu     bool
+	Modifying    bool
 }
 
 func (m *Model) CurrItem() (ItemRender, error) {
 	return m.lm.Curr()
 }
 
+func (m *Model) CurrFile() (ItemRender, error) {
+	files := m.lm.Files()
+	if len(files) == 0 {
+		return nil, errors.New("empty file list")
+	}
+	if m.lm.fileIndex > len(files)-1 {
+		return nil, errors.New("file index out of range")
+	}
+	return files[m.lm.fileIndex], nil
+}
+
 func (m *Model) CurrMenu() *Menu {
-	menus := m.menuFetcher()
+	menus := m.menuFetcher(m.Modifying)
 	if m.MenuIndex < len(menus) {
 		return menus[m.MenuIndex]
 	}
@@ -104,7 +135,9 @@ func (m *Model) CurrMenu() *Menu {
 }
 
 func (m *Model) FreshList() {
-	m.lm.newSearch(m.Inputs)
+	if !m.ShowMenu {
+		m.lm.newSearch(m.Inputs)
+	}
 }
 
 // var asciiPattern, _ = regexp.Compile("^[a-zA-z\\d]$")
@@ -140,7 +173,7 @@ func (m *Model) inputCtl(key string) {
 }
 
 func (m *Model) menuCtl(key string) {
-	menus := m.menuFetcher()
+	menus := m.menuFetcher(m.Modifying)
 	switch key {
 	case "left":
 		if m.MenuIndex > 0 {
@@ -160,7 +193,6 @@ func (m *Model) menuCtl(key string) {
 			}
 		}
 	}
-	// m.FreshList()
 }
 
 func (m *Model) Init() tea.Cmd {
@@ -176,22 +208,30 @@ func (m *Model) View() string {
 	renderCnt := m.hx - 5 // 5 is header lines(1) + footer lines(4)
 	// body
 	list := m.lm.List()
+	currIndex := m.lm.currIndex
+	if m.ShowMenu && m.CurrMenu().Name == "Add" {
+		list = m.lm.Files()
+		currIndex = m.lm.fileIndex
+	}
 	le := len(list)
+	// body empty lines
 	if remain := renderCnt - le; remain > 0 {
 		sb.WriteString(strings.Repeat("\n", remain))
 	}
 	if le < renderCnt {
 		renderCnt = le
 	}
-	start, end := renderCnt-1, 0
-	if m.lm.currIndex > renderCnt-1 {
-		start, end = m.lm.currIndex, m.lm.currIndex-renderCnt+1
-	}
-	for i := start; i >= end; i-- {
-		if i == m.lm.currIndex {
-			sb.WriteString(fmt.Sprintf("\x1b[31m>\x1b[0m \x1b[1;4;35m\x1b[47m%3d: %s\x1b[0m\n", i+1, list[i].String()))
-		} else {
-			sb.WriteString(fmt.Sprintf("> %3d: %s\n", i+1, list[i].String()))
+	if renderCnt > 0 {
+		top, bot := renderCnt-1, 0
+		if currIndex > top {
+			top, bot = currIndex, currIndex-renderCnt+1
+		}
+		for i := top; i >= bot; i-- {
+			if i == currIndex {
+				sb.WriteString(fmt.Sprintf("\x1b[31m>\x1b[0m \x1b[1;4;35m\x1b[47m%3d: %s\x1b[0m\n", i+1, list[i].String()))
+			} else {
+				sb.WriteString(fmt.Sprintf("> %3d: %s\n", i+1, list[i].String()))
+			}
 		}
 	}
 	// footer
@@ -199,7 +239,7 @@ func (m *Model) View() string {
 	sb.WriteString("Press[Enter:Menu][Ctrl+X:Clear Input][Ctrl+C|ESC:Quit][Ctrl+O:Export Dict]\n")
 	sb.WriteString(line + "\n")
 
-	if menus := m.menuFetcher(); m.ShowMenu && len(menus) > 0 {
+	if menus := m.menuFetcher(m.Modifying); m.ShowMenu && len(menus) > 0 {
 		sb.WriteString(": ")
 		for i, menu := range menus {
 			nameR := []rune(menu.Name)
@@ -237,18 +277,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.wx = msg.Width
 		m.hx = msg.Height
-	case FreshListMsg:
-		log.Printf("FreshListMsg")
 	}
 	return m, nil
 }
 
-func NewModel(lm *ListManager, menuFetcher func() []*Menu, events ...*Event) *Model {
+func NewModel(lm *ListManager, menuFetcher func(bool) []*Menu, events ...*Event) *Model {
 	fd := os.Stderr.Fd()
 	wx, hx, err := term.GetSize(int(fd))
 	if err != nil {
 		fmt.Printf("Terminal GetSize Error: %v\n", err)
 		os.Exit(1)
 	}
-	return &Model{lm: lm, wx: wx, hx: hx, menuFetcher: menuFetcher, eventManager: NewEventManager(events...)}
+	model := &Model{lm: lm, wx: wx, hx: hx, menuFetcher: menuFetcher, eventManager: NewEventManager(events...)}
+	return model
 }

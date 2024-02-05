@@ -39,6 +39,12 @@ func (m *CacheMatcher) Reset() {
 var slab = util.MakeSlab(100*1024, 2048)
 
 func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*MatchResult, ctx context.Context) {
+	var done bool
+	go func() {
+		<-ctx.Done()
+		log.Println("ctx done")
+		done = true
+	}()
 	var cache []*MatchResult
 	if m.cache != nil {
 		cachedKey := ""
@@ -47,6 +53,9 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*Ma
 			if cache = m.cache[cachedKey]; cache != nil {
 				break
 			}
+		}
+		if done {
+			return
 		}
 		if cache != nil && cachedKey == string(key) {
 			resultChan <- cache
@@ -60,13 +69,6 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*Ma
 			list[i] = m.Entry
 		}
 	}
-
-	var done bool
-	go func() {
-		<-ctx.Done()
-		log.Println("ctx done")
-		done = true
-	}()
 
 	const CHUNK_SIZE = 500
 	matched := make([]MatchResult, 0)
