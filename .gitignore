@@ -1,6 +1,5 @@
 /config/debug.log
 /.idea
 /rimedi*
-rimedictmanager
 rimedm
 go.sum

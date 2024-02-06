@@ -2,7 +2,6 @@ package dict
 
 import (
 	"context"
-	"log"
 
 	"github.com/junegunn/fzf/src/algo"
 	"github.com/junegunn/fzf/src/util"
@@ -42,7 +41,6 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*Ma
 	var done bool
 	go func() {
 		<-ctx.Done()
-		log.Println("ctx done")
 		done = true
 	}()
 	var cache []*MatchResult

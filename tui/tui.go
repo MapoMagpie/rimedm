@@ -39,7 +39,7 @@ type ListManager struct {
 	fileIndex  int
 	setVer     int
 	getVer     int
-	lock       sync.Mutex
+	lock       sync.Mutex // do we need lock?
 }
 
 func NewListManager(searchChan chan<- string) *ListManager {
@@ -49,6 +49,7 @@ func NewListManager(searchChan chan<- string) *ListManager {
 func (l *ListManager) List() []ItemRender {
 	list := l.list
 	le := len(list)
+	// fix currIndex
 	if le == 0 {
 		l.currIndex = 0
 	} else if l.currIndex > le-1 {
@@ -80,10 +81,9 @@ func (l *ListManager) Curr() (ItemRender, error) {
 func (l *ListManager) newSearch(inputs []string) {
 	l.lock.Lock()
 	l.list = make([]ItemRender, 0)
-	// l.currIndex = 0
-	log.Printf("send search key: %v\n", strings.Join(inputs, ""))
+	log.Printf("send search key: %v", strings.Join(inputs, ""))
 	l.SearchChan <- strings.Join(inputs, "")
-	log.Printf("send search key: finshed\n")
+	log.Printf("send search key finshed")
 	l.lock.Unlock()
 }
 

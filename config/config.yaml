@@ -11,7 +11,8 @@
 # 禁止
 #	- 主词典1下的拓展词典文件路径
 dict_paths:
-	- $HOME/.local/share/fcitx5/rime/xkjd6.dict.yaml
+	- ./rime/xkjd/xkjd6.dict.yaml
+	# - ./rime/xhup/flypy_sys.txt
 
 # user_path 是用户词典路径，可以为空，
 #	当指定了用户词典时，在添加新词时，用户词典会作为优先的添加选项。
@@ -19,11 +20,11 @@ dict_paths:
 #user_path: 
 
 # 是否在每次添加、删除、修改时立即同步到词典文件，默认为 true
-sync_on_change: true 
+#sync_on_change: true 
 # 在同步词典文件时，通过这个命令来重启 rime, 不同的系统环境下需要不同的命令。
 # 在Linux + Fcitx5 下可通过此命令来重启 rime: 
 #	dbus-send --session --print-reply --dest=org.fcitx.Fcitx5 /controller org.fcitx.Fcitx.Controller1.SetConfig string:'fcitx://config/addon/rime' variant:string:''
 # 在Windows + 小狼毫 下可通过此命令来重启 rime(注意程序版本): 
 #	C:\PROGRA~2\Rime\weasel-0.14.3\WeaselDeployer.exe /deploy
 #	注:PROGRA~2 = Program Files (x86) PROGRA~1 = Program Files
-restart_rime_cmd: dbus-send --session --print-reply --dest=org.fcitx.Fcitx5 /controller org.fcitx.Fcitx.Controller1.SetConfig string:'fcitx://config/addon/rime' variant:string:''
+#restart_rime_cmd: dbus-send --session --print-reply --dest=org.fcitx.Fcitx5 /controller org.fcitx.Fcitx.Controller1.SetConfig string:'fcitx://config/addon/rime' variant:string:''

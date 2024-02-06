@@ -19,14 +19,10 @@ import (
 func Start(opts *Options) {
 	// load dict file and create dictionary
 	start := time.Now()
-	fes := make([]*dict.FileEntries, 0)
-	for _, dictPath := range opts.DictPaths {
-		ret := dict.LoadItems(dictPath)
-		sort.Slice(ret, func(i, j int) bool {
-			return ret[i].Order() < ret[j].Order()
-		})
-		fes = append(fes, ret...)
-	}
+	fes := dict.LoadItems(opts.DictPaths...)
+	sort.Slice(fes, func(i, j int) bool {
+		return fes[i].Order() < fes[j].Order()
+	})
 	since := time.Since(start)
 	log.Printf("Load %s: %s\n", opts.DictPaths, since)
 	dc := dict.NewDictionary(fes, &dict.CacheMatcher{})
@@ -60,6 +56,7 @@ func Start(opts *Options) {
 				filePath := file.String()
 				dc.ResetMatcher()
 				dc.Add(dict.NewEntryAdd([]byte(strings.Join(pair[:], "\t")), filePath))
+				log.Printf("add item: %s\n", pair)
 				m.Inputs = []string{}
 				m.InputCursor = 0
 				FlushAndSync(opts, dc, opts.SyncOnChange)
@@ -78,6 +75,7 @@ func Start(opts *Options) {
 		case *dict.MatchResult:
 			dc.ResetMatcher()
 			dc.Delete(item.Entry)
+			log.Printf("delete item: %s\n", item)
 			FlushAndSync(opts, dc, opts.SyncOnChange)
 		}
 		return tui.ExitMenuCmd
@@ -102,7 +100,6 @@ func Start(opts *Options) {
 	menuNameConfirm := tui.Menu{Name: "Confirm", Cb: func(m *tui.Model) tea.Cmd {
 		m.Modifying = false
 		str := strings.Join(m.Inputs, "")
-		log.Printf("modify confirm str: %s\n", str)
 		switch item := modifyingItem.(type) {
 		case *dict.MatchResult:
 			log.Printf("modify confirm item: %s\n", item)
@@ -171,14 +168,13 @@ func Start(opts *Options) {
 				rs := []rune(raw)
 				if len(raw) > 0 {
 					pair := dict.ParseInput(raw)
-					// log.Printf("pair: %v\n", pair)
 					if pair[1] != "" {
 						rs = []rune(pair[1])
 					}
 				}
 				go dc.Search(rs, ch, ctx)
 			case ret := <-ch:
-				if ret != nil {
+				if len(ret) > 0 {
 					list := make([]tui.ItemRender, len(ret))
 					for i, entry := range ret {
 						list[i] = entry
@@ -189,7 +185,6 @@ func Start(opts *Options) {
 			case <-timer.C:
 				if hasAppend {
 					hasAppend = false
-					log.Printf("timer.C")
 					teaProgram.Send(tui.FreshListMsg(0))
 				}
 			}

@@ -25,7 +25,7 @@ func ParseOptions() (Options, string) {
 	configPath := filepath.Join(configDir, "rimedm", "config.yaml")
 
 	var flags Options
-	flag.Func("d", "主词典文件(方案名.dict.yaml)路径，通过主词典会自动加载其他拓展词典，支持多个文件", func(path string) error {
+	flag.Func("d", "(当使用配置文件时可选)主词典文件(方案名.dict.yaml)路径，通过主词典会自动加载其他拓展词典，无需指定拓展词典。\n支持多个主词典文件，e.g: rimedm -d ./xkjd6.dict.yaml -d ./xhup.dict.txt", func(path string) error {
 		if flags.DictPaths == nil {
 			flags.DictPaths = make([]string, 0)
 		}
@@ -33,17 +33,18 @@ func ParseOptions() (Options, string) {
 		return nil
 	})
 
-	flag.StringVar(&flags.UserPath, "u", "", "用户词典路径，可以为空")
-	flag.StringVar(&flags.RestartRimeCmd, "cmd", "", "同步词典后，重新部署rime的命令，使更改即时生效，不同的系统环境下需要不同的命令")
-	flag.BoolVar(&flags.SyncOnChange, "sync", true, "是否在每次添加、删除、修改时立即同步到词典文件，默认为 true")
-	flag.StringVar(&configPath, "c", configPath, "配置文件路径，默认位置:"+configPath)
+	flag.StringVar(&flags.UserPath, "u", "", "(可选)用户词典路径")
+	flag.StringVar(&flags.RestartRimeCmd, "cmd", "", "(可选)同步到词典文件后，用于重新部署rime的命令，使更改即时生效，不同的系统环境下需要不同的命令")
+	flag.BoolVar(&flags.SyncOnChange, "sync", true, "(可选)是否在每次添加、删除、修改时立即同步到词典文件，默认为 true")
+	flag.StringVar(&configPath, "c", configPath, "(可选)配置文件路径，默认位置:"+configPath)
 	flag.Parse()
 
 	configPath = fixPath(configPath)
 	opts := parseFromFile(configPath)
 
-	if flags.DictPaths != nil && len(flags.DictPaths) > 0 {
+	if len(flags.DictPaths) > 0 {
 		opts.DictPaths = flags.DictPaths
+		opts.UserPath = ""
 	}
 	if flags.UserPath != "" {
 		opts.UserPath = flags.UserPath

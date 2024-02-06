@@ -29,22 +29,29 @@ func (fe *FileEntries) Order() int {
 	return fe.order
 }
 
-func LoadItems(path string) (fes []*FileEntries) {
+func LoadItems(paths ...string) (fes []*FileEntries) {
 	fes = make([]*FileEntries, 0)
 	ch := make(chan *FileEntries)
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		loadFromFile(path, 0, ch, &wg)
-	}()
+	for _, path := range paths {
+		wg.Add(1)
+		go loadFromFile(path, 0, ch, &wg)
+	}
 	go func() {
 		wg.Wait()
 		close(ch)
 	}()
+	fileNames := make(map[string]bool)
 	for fe := range ch {
 		if fe.Err != nil {
-			fmt.Printf("load [%s] error: %s", fe.FilePath, fe.Err)
+			log.Printf("load [%s] error: %s", fe.FilePath, fe.Err)
+			continue
 		}
+		if _, ok := fileNames[fe.FilePath]; ok {
+			log.Printf("file [%s] already loaded", fe.FilePath)
+			continue
+		}
+		fileNames[fe.FilePath] = true
 		fes = append(fes, fe)
 	}
 	return
