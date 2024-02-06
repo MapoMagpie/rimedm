@@ -68,10 +68,10 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*Ma
 		}
 	}
 
-	const CHUNK_SIZE = 500
-	matched := make([]MatchResult, 0)
+	matched := make([]*MatchResult, 0)
 	lastIdx := 0
 	listLen := len(list)
+	chunkSize := 50000 // chunkSize = listLen means no async search
 	for idx, entry := range list {
 		if entry.modType == DELETE {
 			continue
@@ -81,31 +81,19 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*Ma
 			return
 		}
 		if result.Score > 0 {
-			matched = append(matched, MatchResult{entry, result})
+			matched = append(matched, &MatchResult{entry, result})
 		}
-		if idx%CHUNK_SIZE == 0 || idx == listLen-1 {
+		if idx%chunkSize == 0 || idx == listLen-1 {
 			m2 := matched[lastIdx:]
 			if len(m2) > 0 {
-				ret := make([]*MatchResult, len(m2))
-				// why ret elements alaways same?
-				// for i, m := range m2 {
-				//   ret[i] = &m
-				// }
-				for i := 0; i < len(m2); i++ {
-					ret[i] = &m2[i]
-				}
-				resultChan <- ret
+				resultChan <- m2
 				lastIdx = len(matched)
 			}
 		}
 	}
 
-	cache = make([]*MatchResult, len(matched))
-	for i := 0; i < len(matched); i++ {
-		cache[i] = &matched[i]
-	}
 	if m.cache == nil {
 		m.cache = make(map[string][]*MatchResult)
 	}
-	m.cache[string(key)] = cache
+	m.cache[string(key)] = matched
 }

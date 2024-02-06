@@ -155,7 +155,7 @@ func Start(opts *Options) {
 	go func() {
 		var cancelFunc context.CancelFunc
 		ch := make(chan []*dict.MatchResult)
-		timer := time.NewTicker(time.Millisecond * 20)
+		timer := time.NewTicker(time.Millisecond * 100)
 		hasAppend := false
 		for {
 			select {
