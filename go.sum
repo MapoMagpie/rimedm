@@ -2,8 +2,6 @@ github.com/aymanbagabas/go-osc52/v2 v2.0.1 h1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiE
 github.com/aymanbagabas/go-osc52/v2 v2.0.1/go.mod h1:uYgXzlJ7ZpABp8OJ+exZzJJhRNQ2ASbcXHWsFqH8hp8=
 github.com/charmbracelet/bubbletea v0.25.0 h1:bAfwk7jRz7FKFl9RzlIULPkStffg5k6pNt5dywy4TcM=
 github.com/charmbracelet/bubbletea v0.25.0/go.mod h1:EN3QDR1T5ZdWmdfDzYcqOCAps45+QIJbLOBxmVNWNNg=
-github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 h1:q2hJAaP1k2wIvVRd/hEHD7lacgqrCPS+k8g1MndzfWY=
-github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81/go.mod h1:YynlIjWYF8myEu6sdkwKIvGQq+cOckRm6So2avqoYAk=
 github.com/containerd/console v1.0.4 h1:F2g4+oChYvBTsASRTz8NP6iIAi97J3TtSAsLbIFn4ro=
 github.com/containerd/console v1.0.4/go.mod h1:YynlIjWYF8myEu6sdkwKIvGQq+cOckRm6So2avqoYAk=
 github.com/fatih/color v1.16.0 h1:zmkK9Ngbjj+K0yRhTVONQh1p/HknKYSlNT+vZCzyokM=
@@ -18,8 +16,6 @@ github.com/goccy/go-yaml v1.11.3 h1:B3W9IdWbvrUu2OYQGwvU1nZtvMQJPBKgBUuweJjLj6I=
 github.com/goccy/go-yaml v1.11.3/go.mod h1:wKnAMd44+9JAAnGQpWVEgBzGt3YuTaQ4uXoHvE4m7WU=
 github.com/google/go-cmp v0.5.9 h1:O2Tfq5qg4qc4AmwVlvv0oLiVAGB7enBSJ2x2DqQFi38=
 github.com/google/go-cmp v0.5.9/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
-github.com/junegunn/fzf v0.0.0-20240204000139-1a43259989fc h1:DodvwrC3qtUJdupgFRPvimN+pT2kRNp7V0TCNf8L3/4=
-github.com/junegunn/fzf v0.0.0-20240204000139-1a43259989fc/go.mod h1:zJ7ohShEeoQpEtLICzwf51DNJjWcJeT7pijFhcuEEek=
 github.com/junegunn/fzf v0.0.0-20240204100232-90b818788249 h1:aGoMSHkJVvqYSH16J2ZL+D+yfvTdoRBUxsUvFwjm+Fs=
 github.com/junegunn/fzf v0.0.0-20240204100232-90b818788249/go.mod h1:zJ7ohShEeoQpEtLICzwf51DNJjWcJeT7pijFhcuEEek=
 github.com/leodido/go-urn v1.2.0 h1:hpXL4XnriNwQ/ABnpepYM/1vCLWNDfUNts8dX3xTG6Y=
