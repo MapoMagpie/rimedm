@@ -13,6 +13,8 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
+var version = "1.0.2"
+
 type Options struct {
 	RestartRimeCmd string   `yaml:"restart_rime_cmd"`
 	UserPath       string   `yaml:"user_path"`
@@ -37,7 +39,12 @@ func ParseOptions() (Options, string) {
 	flag.StringVar(&flags.RestartRimeCmd, "cmd", "", "(可选)同步到词典文件后，用于重新部署rime的命令，使更改即时生效，不同的系统环境下需要不同的命令")
 	flag.BoolVar(&flags.SyncOnChange, "sync", true, "(可选)是否在每次添加、删除、修改时立即同步到词典文件，默认为 true")
 	flag.StringVar(&configPath, "c", configPath, "(可选)配置文件路径，默认位置:"+configPath)
+	showVersion := flag.Bool("v", false, "显示版本号")
 	flag.Parse()
+	if *showVersion {
+		fmt.Println(version)
+		os.Exit(0)
+	}
 
 	configPath = fixPath(configPath)
 	opts := parseFromFile(configPath)
