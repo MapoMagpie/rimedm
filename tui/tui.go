@@ -7,7 +7,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/term"
@@ -39,11 +38,10 @@ type ListManager struct {
 	fileIndex  int
 	setVer     int
 	getVer     int
-	lock       sync.Mutex // do we need lock?
 }
 
 func NewListManager(searchChan chan<- string) *ListManager {
-	return &ListManager{SearchChan: searchChan, lock: sync.Mutex{}}
+	return &ListManager{SearchChan: searchChan}
 }
 
 func (l *ListManager) List() []ItemRender {
@@ -56,12 +54,10 @@ func (l *ListManager) List() []ItemRender {
 		l.currIndex = le - 1
 	}
 	if l.getVer != l.setVer {
-		l.lock.Lock()
 		sort.Slice(list, func(i, j int) bool {
 			return list[i].Order()-list[j].Order() > 0
 		})
 		l.getVer = l.setVer
-		l.lock.Unlock()
 	}
 	return list
 }
@@ -78,20 +74,19 @@ func (l *ListManager) Curr() (ItemRender, error) {
 	}
 }
 
-func (l *ListManager) newSearch(inputs []string) {
-	l.lock.Lock()
+func (l *ListManager) NewList() {
 	l.list = make([]ItemRender, 0)
+}
+
+func (l *ListManager) newSearch(inputs []string) {
 	log.Printf("send search key: %v", strings.Join(inputs, ""))
 	l.SearchChan <- strings.Join(inputs, "")
 	log.Printf("send search key finshed")
-	l.lock.Unlock()
 }
 
 func (l *ListManager) AppendList(rs []ItemRender) {
-	l.lock.Lock()
 	l.setVer++
 	l.list = append(l.list, rs...)
-	l.lock.Unlock()
 }
 
 func (l *ListManager) SetFiles(files []ItemRender) {

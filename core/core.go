@@ -146,7 +146,7 @@ func Start(opts *Options) {
 		},
 	}
 
-	searchChan := make(chan string, 10)
+	searchChan := make(chan string, 20)
 	listManager := tui.NewListManager(searchChan)
 	listManager.SetFiles(fileNames)
 	model := tui.NewModel(listManager, menuFetcher, tui.MoveEvent, tui.EnterEvent, tui.ClearInputEvent, exitEvent, exportDictEvent)
@@ -160,6 +160,7 @@ func Start(opts *Options) {
 		for {
 			select {
 			case raw := <-searchChan:
+				listManager.NewList()
 				ctx, cancel := context.WithCancel(context.Background())
 				if cancelFunc != nil {
 					cancelFunc()
