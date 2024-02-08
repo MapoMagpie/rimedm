@@ -83,7 +83,7 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*Ma
 		if result.Score > 0 {
 			matched = append(matched, &MatchResult{entry, result})
 		}
-		if idx%chunkSize == 0 || idx == listLen-1 {
+		if (idx%chunkSize == 0 && idx != 0) || idx == listLen-1 {
 			m2 := matched[lastIdx:]
 			if len(m2) > 0 {
 				resultChan <- m2

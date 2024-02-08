@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/junegunn/fzf/src/util"
@@ -152,41 +153,42 @@ func (e *Entry) WriteLine() []byte {
 	return bs
 }
 
-// ParseInput \n
-// "你\t好" > "你", "好", ""
-// "你 好" > "你", "好", ""
-// "你  好" > "你", "好", ""
-// "你\t 好" > "你", "好", ""
-// "你   好\t 1" > "你", "好", "1"
-// "你好 nau 1" > "你好", "nau", "1"
-// "nau 你好 1" > "你好", "nau", "1"
-// "  nau 你好 1 " > "你好", "nau", "1"
-func ParseInput(raw string) [3]string {
-	pair := [3]string{}
-	for j, l, i := 0, 0, 0; i <= len(raw); i++ {
-		if i == len(raw) || raw[i] == '\t' || raw[i] == ' ' {
-			if l == i {
-				l = i + 1
-				continue
+// Parse input string to a pair of strings
+// 0: 表(汉字) 1: 码(字母) 2: 权重
+// 支持乱序输入，如 "你好 nau 1" 或 "nau 1 你好"
+func ParseInput(raw string) (pair [3]string) {
+	pair = [3]string{}
+	// split by '\t' or ' '
+	splits := strings.Fields(raw)
+	for i := 0; i < len(splits); i++ {
+		item := strings.TrimSpace(splits[i])
+		if len(item) == 0 {
+			continue
+		}
+		if isNumber(item) {
+			pair[2] = item
+			continue
+		}
+		if isAscii(item) {
+			pair[1] = item
+		} else {
+			space := " "
+			if pair[0] == "" {
+				space = ""
 			}
-			pair[j] = raw[l:i]
-			l = i + 1
-			j++
+			pair[0] = pair[0] + space + item
 		}
 	}
-	notAsciiIndex := 0
-	for i, p := range pair {
-		if !isAscii(p) {
-			notAsciiIndex = i
-			break
+	return
+}
+
+func isNumber(str string) bool {
+	for _, r := range str {
+		if r < '0' || r > '9' {
+			return false
 		}
 	}
-	if notAsciiIndex != 0 {
-		t := pair[notAsciiIndex]
-		pair[notAsciiIndex] = pair[0]
-		pair[0] = t
-	}
-	return pair
+	return true
 }
 
 func isAscii(str string) bool {
@@ -198,15 +200,24 @@ func isAscii(str string) bool {
 	return true
 }
 
+// Parse bytes as a couple of strings([]byte) separated by '\t'
+// e.g. "你好	nau" > ["你好", "nau"]
+// not like ParseInput, this function simply split by '\t'
 func ParsePair(raw []byte) [][]byte {
 	pair := make([][]byte, 0)
 	for i, j := 0, 0; i < len(raw); i++ {
 		if raw[i] == '\t' {
-			pair = append(pair, bytes.TrimSpace(raw[j:i]))
+			item := bytes.TrimSpace(raw[j:i])
+			if len(item) > 0 {
+				pair = append(pair, item)
+			}
 			j = i + 1
 		}
 		if i == len(raw)-1 && j <= i {
-			pair = append(pair, bytes.TrimSpace(raw[j:]))
+			item := bytes.TrimSpace(raw[j:])
+			if len(item) > 0 {
+				pair = append(pair, item)
+			}
 		}
 	}
 	return pair

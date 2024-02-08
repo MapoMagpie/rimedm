@@ -53,13 +53,12 @@ func tryFatalf(err error, format string, args ...interface{}) {
 		log.Fatalf(format, args...)
 	}
 }
+
 func outputFile(rawBs []byte, path string, entries []*Entry) {
-	//log.Printf("rawBs now len %d\n", len(rawBs))
+	// log.Printf("rawBs now len %d\n", len(rawBs))
 	file, err := os.OpenFile(path, os.O_RDWR, 0666)
 	tryFatalf(err, "open File failed, Err:%v", err)
-	defer func() {
-		_ = file.Close()
-	}()
+	defer file.Close()
 	bs := make([]byte, len(rawBs))
 	copy(bs, rawBs)
 	willAddEntries := make([]*Entry, 0)
