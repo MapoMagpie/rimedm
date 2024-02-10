@@ -8,23 +8,6 @@
 # 2. $exe or $e
 
 $ErrorActionPreference = 'Stop'
-$inputRepo = if ($repo) {
-  "${repo}"
-} else {
-  "${r}"
-}
-
-$inputVersion = if ($version) {
-  "${version}"
-} else {
-  "${v}"
-}
-
-$inputExe = if ($exe) {
-  "${exe}"
-} else {
-  "${e}"
-}
 
 $githubUrl = if ($github) {
   "${github}"
@@ -34,38 +17,28 @@ $githubUrl = if ($github) {
   "https://github.com"
 }
 
-$arr = $inputRepo.Split('/')
-
-$owner = $arr.Get(0)
-$repoName = $arr.Get(1)
-$exeName = "${inputExe}"
-
-if ($exeName -eq "") {
-  $exeName = "${repoName}"
-}
-
-if ($inputVersion) {
-  $version = "${inputVersion}"
-}
+$owner = "MapoMagpie"
+$repoName = "rimedm"
+$exeName = "rimedm"
 
 if ([Environment]::Is64BitProcess) {
-  $arch = "amd64"
+  $arch = "x86_64"
 } else {
-  $arch = "386"
+  $arch = "i386"
 }
 
 $BinDir = "$Home\bin"
-$downloadedTagGz = "$BinDir\${exeName}.tar.gz"
+$downloadedTagGz = "$BinDir\${exeName}.zip"
 $downloadedExe = "$BinDir\${exeName}.exe"
-$Target = "windows_$arch"
+$Target = "Windows_$arch"
 
 # GitHub requires TLS 1.2
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $ResourceUri = if (!$version) {
-  "${githubUrl}/${owner}/${repoName}/releases/latest/download/${exeName}_${Target}.tar.gz"
+  "${githubUrl}/${owner}/${repoName}/releases/latest/download/${exeName}_${Target}.zip"
 } else {
-  "${githubUrl}/${owner}/${repoName}/releases/download/${Version}/${exeName}_${Target}.tar.gz"
+  "${githubUrl}/${owner}/${repoName}/releases/download/${Version}/${exeName}_${Target}.zip"
 }
 
 if (!(Test-Path $BinDir)) {
@@ -115,4 +88,4 @@ if (!(";$Path;".ToLower() -like "*;$BinDir;*".ToLower())) {
 }
 
 Write-Output "${exeName} was installed successfully to $downloadedExe"
-Write-Output "Run '${exeName} --help' to get started"
+Write-Output "Run '${exeName} --h' to get started"
