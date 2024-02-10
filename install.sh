@@ -79,6 +79,10 @@ downloaded_file="${downloadFolder}/${file_name}" # the file path should be downl
 executable_folder="/usr/local/bin" # Eventually, the executable file will be placed here
 if [ ! -w "${executable_folder}" ]; then
 	executable_folder="${HOME}/.local/bin"
+	# check if the directory exists
+	if [ ! -d "${executable_folder}" ]; then
+		mkdir -p ${executable_folder}
+	fi
 fi
 
 # if version is empty
