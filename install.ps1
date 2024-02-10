@@ -27,7 +27,7 @@ if ([Environment]::Is64BitProcess) {
   $arch = "i386"
 }
 
-$BinDir = "$Home\bin"
+$BinDir = "$Home\Appdata\Local\Programs\rimedm"
 $downloadedTagGz = "$BinDir\${exeName}.zip"
 $downloadedExe = "$BinDir\${exeName}.exe"
 $Target = "Windows_$arch"
@@ -58,25 +58,17 @@ function Check-Command {
   catch [System.Management.Automation.CommandNotFoundException]
   {
       $found = $false
-  }
+anakan
+}
 
   $found
 }
 
-if (Check-Command -Command tar) {
-  Invoke-Expression "tar -xvzf $downloadedTagGz -C $BinDir"
-} else {
-  function Expand-Tar($tarFile, $dest) {
-
-      if (-not (Get-Command Expand-7Zip -ErrorAction Ignore)) {
-          Install-Package -Scope CurrentUser -Force 7Zip4PowerShell > $null
-      }
-
-      Expand-7Zip $tarFile $dest
-  }
-
-  Expand-Tar $downloadedTagGz $BinDir
+function Unzip($zipFile, $dest) {
+  Expand-Archive -Force -Path $zipFile -DestinationPath $dest
 }
+
+Unzip $downloadedTagGz $BinDir
 
 Remove-Item $downloadedTagGz
 
