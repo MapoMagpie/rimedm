@@ -7,7 +7,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/goccy/go-yaml"
@@ -142,15 +144,21 @@ func osRimeDefaultValue() (dictPath, restartRimeCmd string) {
 	case "windows":
 		// find rime install path
 		dirEntries, err := os.ReadDir("C:\\PROGRA~2\\Rime")
+		var maxVersion string
 		if err == nil && len(dirEntries) > 0 {
 			for _, dir := range dirEntries {
 				if dir.IsDir() && strings.HasPrefix(dir.Name(), "weasel") {
-					restartRimeCmd = filepath.Join("C:\\PROGRA~2\\Rime", dir.Name(), "WeaselDeployer.exe") + " /deploy"
-					break
+					dirName := dir.Name()
+					if compareVersion(dirName, maxVersion) {
+						maxVersion = dirName
+					}
 				} else {
 					continue
 				}
 			}
+		}
+		if maxVersion != "" {
+			restartRimeCmd = filepath.Join("C:\\PROGRA~2\\Rime", maxVersion, "WeaselDeployer.exe") + " /deploy"
 		}
 		defaultSchema := findRimeDefaultSchema(filepath.Join(configDir, "rime", "default.custom.yaml"))
 		dictPath = filepath.Join(configDir, "Rime", defaultSchema+".dict.yaml")
@@ -227,4 +235,29 @@ func fixPath(path string) string {
 		path = homeDir + path[1:]
 	}
 	return os.ExpandEnv(path)
+}
+
+func parseVersion(version string) []int {
+	ret := make([]int, 0)
+	reg := regexp.MustCompile(`\d+`)
+	res := reg.FindAllString(version, -1)
+	for _, v := range res {
+		num, err := strconv.Atoi(v)
+		if err != nil {
+			fmt.Println("convert error", v)
+		}
+		ret = append(ret, num)
+	}
+	return ret
+}
+
+func compareVersion(v1, v2 string) bool {
+	vi := parseVersion(v1)
+	vj := parseVersion(v2)
+	for k := 0; k < len(vi) && k < len(vj); k++ {
+		if vi[k] != vj[k] {
+			return vi[k] > vj[k]
+		}
+	}
+	return v1 > v2
 }

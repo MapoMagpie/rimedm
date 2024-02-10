@@ -204,6 +204,7 @@ func FlushAndSync(opts *Options, dc *dict.Dictionary, ok bool) {
 	}
 	dc.Flush()
 	if opts.RestartRimeCmd != "" {
+		// TODO: check RestartRimeCmd, if weasel updated, the program path may be changed
 		cmd := util.ExecCommand(opts.RestartRimeCmd, false)
 		err := cmd.Run()
 		if err != nil {
