@@ -69,7 +69,9 @@ func Start(opts *Options) {
 	menuNameDelete := tui.Menu{Name: "Delete", Cb: func(m *tui.Model) (cmd tea.Cmd) {
 		item, err := m.CurrItem()
 		if err != nil {
-			return
+			m.Inputs = []string{}
+			m.InputCursor = 0
+			return tui.ExitMenuCmd
 		}
 		switch item := item.(type) {
 		case *dict.MatchResult:
@@ -84,11 +86,13 @@ func Start(opts *Options) {
 	// 修改菜单
 	var modifyingItem tui.ItemRender
 	menuNameModify := tui.Menu{Name: "Modify", Cb: func(m *tui.Model) (cmd tea.Cmd) {
-		m.Modifying = true
 		item, err := m.CurrItem()
 		if err != nil {
-			return
+			m.Inputs = []string{}
+			m.InputCursor = 0
+			return tui.ExitMenuCmd
 		}
+		m.Modifying = true
 		modifyingItem = item
 		m.Inputs = strings.Split(strings.TrimSpace(modifyingItem.String()), "")
 		m.InputCursor = len(m.Inputs)

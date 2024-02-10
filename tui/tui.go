@@ -232,6 +232,9 @@ func (m *Model) View() string {
 	// footer
 	sb.WriteString(fmt.Sprintf("Total: %d\n", le))
 	sb.WriteString("Press[Enter:Menu][Ctrl+X:Clear Input][Ctrl+C|ESC:Quit][Ctrl+O:Export Dict]\n")
+	if m.Modifying {
+		line = strings.Replace(line, "---------", "Modifying", 1)
+	}
 	sb.WriteString(line + "\n")
 
 	if menus := m.menuFetcher(m.Modifying); m.ShowMenu && len(menus) > 0 {
