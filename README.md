@@ -9,8 +9,30 @@
 ![修改](.assets/rimedm_修改.gif)
 ### 删词
 ![删词](.assets/rimedm_删词.gif)
+
 ## 安装
-- todo
+
+### 通过一键脚本安装
+#### Windows (可能需要PowerShell 5.1版本以上，从微软应用商店中下载最新的PowerShell)
+复制以下代码，打开PowerShell并粘贴
+```shell
+iwr https://github.com/MapoMagpie/rimedm/raw/main/install.ps1 -useb | iex
+```
+#### Lnux/MacOs
+```shell
+curl -fsSL https://github.com/MapoMagpie/rimedm/raw/main/install.sh | bash -s
+```
+### 手动安装
+#### Windows
+1. 从发布页中下载最新的`rimedm_Windows_x86_64.zip`， [https://github.com/MapoMagpie/rimedm/releases](https://github.com/MapoMagpie/rimedm/releases) 。
+2. 解压文件，文件中包含`rimedm.exe`。
+3. 你可以在解压后的文件夹中打开终端，直接通过`.\rimedm.exe`运行本程序，程序会从小狼毫默认的用户目录中读取你的输入方案。
+4. 你也可以将`rimedm.exe`移动至某个目录中，如:`%Appdata%\rimedm\`，并将该目录添加到环境变量Path中，之后便可以直接在终端中输入`rimedm`运行程序。
+#### Lnux/MacOs
+1. 从发布页中下载最新的`rimedm_Linux_x86_64.tar.gz`或`rimedm_Darwin_x86_64.tar.gz`， [https://github.com/MapoMagpie/rimedm/releases](https://github.com/MapoMagpie/rimedm/releases) 。
+2. 将其解压到常见的用户程序目录中，比如: `~/.local/bin`或`/usr/bin/`。
+3. 输入命令`rimedm`即可。
+
 ## 配置
 > rimedm会根据Rime的相关配置自动生成一份自身所需的配置文件来达到开箱即用的效果。<br>
 > 但也有可能存在系统环境的不同，导致无法自动指定主词典文件。<br>
@@ -61,13 +83,15 @@ rimedm -d 词典文件
 ```shell
 Usage of rimedm:
   -c string
-    	配置文件路径 (default "$HOME/.config/rimedm/config.yaml")
+    	(可选)配置文件路径，默认位置:$HOME/.config/rimedm/config.yaml (default "$HOME/.config/rimedm/config.yaml")
   -cmd string
-    	同步词典后，重新部署rime的命令，使更改即时生效，不同的系统环境下需要不同的命令
+    	(可选)同步到词典文件后，用于重新部署rime的命令，使更改即时生效，不同的系统环境下需要不同的命令
   -d value
-    	主词典文件(方案名.dict.yaml)路径，通过主词典会自动加载其他拓展词典，支持多个文件
+    	(当使用配置文件时可选)主词典文件(方案名.dict.yaml)路径，通过主词典会自动加载其他拓展词典，无需指定拓展词典。
+    	支持多个主词典文件，e.g: rimedm -d ./xkjd6.dict.yaml -d ./xhup.dict.txt
   -sync
-    	是否在每次添加、删除、修改时立即同步到词典文件，默认为 true (default true)
+    	(可选)是否在每次添加、删除、修改时立即同步到词典文件，默认为 true (default true)
   -u string
-    	用户词典路径，可以为空
+    	(可选)用户词典路径
+  -v	显示版本号
 ```
