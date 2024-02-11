@@ -163,9 +163,13 @@ func osRimeDefaultValue() (dictPath, restartRimeCmd string) {
 		defaultSchema := findRimeDefaultSchema(filepath.Join(configDir, "rime", "default.custom.yaml"))
 		dictPath = filepath.Join(configDir, "Rime", defaultSchema+".dict.yaml")
 	case "dwain":
-		restartRimeCmd = "" // i dont know
-		defaultSchema := findRimeDefaultSchema(filepath.Join(configDir, "rime", "default.custom.yaml"))
-		dictPath = filepath.Join(configDir, "rime", defaultSchema+".dict.yaml")
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", ""
+		}
+		restartRimeCmd = "\"/Library/Input Methods/Squirrel.app/Contents/MacOS/Squirrel\" --reload" // mabye
+		defaultSchema := findRimeDefaultSchema(filepath.Join(homeDir, "Library", "Rime", "default.custom.yaml"))
+		dictPath = filepath.Join(homeDir, "Library", "Rime", defaultSchema+".dict.yaml")
 	default:
 		restartRimeCmd = "dbus-send --session --print-reply --dest=org.fcitx.Fcitx5 /controller org.fcitx.Fcitx.Controller1.SetConfig string:'fcitx://config/addon/rime' variant:string:''"
 		defaultSchema := findRimeDefaultSchema("$HOME/.local/share/fcitx5/rime/default.custom.yaml")
