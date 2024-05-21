@@ -193,14 +193,12 @@ func Start(opts *Options) {
 				}
 				go dc.Search(rs, resultChan, ctx)
 			case ret := <-resultChan:
-				if len(ret) > 0 {
-					list := make([]tui.ItemRender, len(ret))
-					for i, entry := range ret {
-						list[i] = entry
-					}
-					listManager.AppendList(list)
-					hasAppend = true
+				list := make([]tui.ItemRender, len(ret))
+				for i, entry := range ret {
+					list[i] = entry
 				}
+				listManager.AppendList(list)
+				hasAppend = true
 			case <-timer.C: // debounce, if appended then flush
 				if hasAppend {
 					hasAppend = false
