@@ -19,6 +19,20 @@ func ExitMenuCmd() tea.Msg {
 
 type FreshListMsg int
 
+func FreshListCmd() tea.Msg {
+	return FreshListMsg(1)
+}
+
+type StringRender string
+
+func (h StringRender) String() string {
+	return string(h)
+}
+
+func (h StringRender) Order() int {
+	return 0
+}
+
 type ItemRender interface {
 	String() string
 	Order() int
@@ -30,13 +44,14 @@ type Menu struct {
 }
 
 type ListManager struct {
-	SearchChan chan<- string
-	list       []ItemRender
-	files      []ItemRender
-	currIndex  int
-	fileIndex  int
-	setVer     int
-	getVer     int
+	SearchChan  chan<- string
+	list        []ItemRender
+	files       []ItemRender
+	ShowingHelp bool
+	currIndex   int
+	fileIndex   int
+	setVer      int
+	getVer      int
 }
 
 func NewListManager(searchChan chan<- string) *ListManager {
@@ -65,6 +80,20 @@ func (l *ListManager) Files() []ItemRender {
 	return l.files
 }
 
+func (l *ListManager) Helps() []ItemRender {
+	list := []ItemRender{
+		StringRender("菜单项: [Modify] 修改选择的项(高亮)，回车后，输入框中的内容会被设置，修改后，再次回车确认修改"),
+		StringRender("菜单项: [Delete] 将选择的项(高亮)从码表中删除，通过上下键选择"),
+		StringRender("菜单项: [Add]    将输入的内容添加到码表中，上下方向键要添加到的文件"),
+		StringRender("Enter:  显示菜单"),
+		StringRender("Ctrl+Right: 修改权重，将当前项的权重加一"),
+		StringRender("Ctrl+Left:  修改权重，将当前项的权重减一"),
+		StringRender("Ctrl+Down:  修改权重，将当前项的权重增加到下一项之前"),
+		StringRender("Ctrl+Up:    修改权重，将当前项的权重降低到上一项之后"),
+	}
+	return list
+}
+
 func (l *ListManager) Curr() (ItemRender, error) {
 	if len(l.list) == 0 {
 		return nil, errors.New("empty list")
@@ -90,6 +119,23 @@ func (l *ListManager) AppendList(rs []ItemRender) {
 
 func (l *ListManager) SetFiles(files []ItemRender) {
 	l.files = files
+}
+
+func (l *ListManager) ReSort() {
+	l.getVer = l.setVer + 1
+}
+
+func (l *ListManager) SetIndex(index int) {
+	if index < 0 {
+		index = 0
+	} else if index > len(l.list)-1 {
+		index = len(l.list) - 1
+	}
+	l.currIndex = index
+}
+
+func (l *ListManager) CurrIndex() int {
+	return l.currIndex
 }
 
 type Model struct {
@@ -203,7 +249,10 @@ func (m *Model) View() string {
 	// body
 	list := m.lm.List()
 	currIndex := m.lm.currIndex
-	if m.ShowMenu && m.CurrMenu().Name == "Add" {
+	if m.lm.ShowingHelp {
+		list = m.lm.Helps()
+		currIndex = 0
+	} else if m.ShowMenu && m.CurrMenu().Name == "Add" {
 		list = m.lm.Files()
 		currIndex = m.lm.fileIndex
 	}
@@ -221,7 +270,7 @@ func (m *Model) View() string {
 			top, bot = currIndex, currIndex-renderCnt+1
 		}
 		for i := top; i >= bot; i-- {
-			if i == currIndex {
+			if i == currIndex && !m.lm.ShowingHelp {
 				sb.WriteString(fmt.Sprintf("\x1b[31m>\x1b[0m \x1b[1;4;35m\x1b[47m%3d: %s\x1b[0m\n", i+1, list[i].String()))
 			} else {
 				sb.WriteString(fmt.Sprintf("> %3d: %s\n", i+1, list[i].String()))
@@ -230,7 +279,7 @@ func (m *Model) View() string {
 	}
 	// footer
 	sb.WriteString(fmt.Sprintf("Total: %d\n", le))
-	sb.WriteString("Press[Enter:Menu][Ctrl+X:Clear Input][Ctrl+C|ESC:Quit][Ctrl+O:Export Dict]\n")
+	sb.WriteString("Press[Enter:Menu][Ctrl+X:Clear Input][Ctrl+C|ESC:Quit][Ctrl+H:Show Help]\n")
 	if m.Modifying {
 		line = strings.Replace(line, "---------", "Modifying", 1)
 	}
@@ -268,6 +317,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else { // search
 			m.inputCtl(key)
 		}
+	case FreshListMsg:
+		m.FreshList()
 	case ExitMenuMsg:
 		m.ShowMenu = false
 		m.FreshList()

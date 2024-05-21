@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -63,22 +65,6 @@ func Start(opts *Options) {
 		}
 		if pair[2] == "" {
 			curr, err := listManager.Curr()
-			// list := listManager.List()
-			// if err == nil && len(list) > 0 {
-			// 	sameCodeList := make([]*dict.Entry, 0)
-			// 	currEntry := curr.(*dict.MatchResult).Entry
-			// 	currEntryIndex := -1
-			// 	for _, item := range list {
-			// 		entry := item.(*dict.MatchResult)
-			// 		if len(entry.Entry.Pair) >= 3 && string(entry.Entry.Pair[1]) == pair[1] && len(entry.Entry.Pair[2]) > 0 { // 过滤掉码不相同的以及没有权重的
-			// 			sameCodeList = append(sameCodeList, entry.Entry)
-			// 		}
-			// 	}
-			// 	if currEntryIndex > -1 {
-			// 		pair[2] = fmt.Sprintf("%d", currEntry.Weight-1)
-			// 	}
-			// 	log.Println("curr entry: ", currEntry, ", same code list: ", sameCodeList)
-			// }
 			if err == nil {
 				currEntry := curr.(*dict.MatchResult).Entry
 				if string(currEntry.Pair[1]) == pair[1] && len(currEntry.Pair) >= 3 && len(currEntry.Pair[2]) > 0 {
@@ -172,7 +158,7 @@ func Start(opts *Options) {
 					return m, nil
 				}
 			}
-			FlushAndSync(opts, dc, !opts.SyncOnChange)
+			FlushAndSync(opts, dc, true)
 			return m, tea.Quit
 		},
 	}
@@ -187,6 +173,81 @@ func Start(opts *Options) {
 		},
 	}
 
+	// 修改权重
+	modifyWeightEvent := &tui.Event{
+		Keys: []string{"ctrl+up", "ctrl+down", "ctrl+left", "ctrl+right"},
+		Cb: func(key string, m *tui.Model) (tea.Model, tea.Cmd) {
+			curr, err := listManager.Curr()
+			if err != nil {
+				return m, nil
+			}
+			currEntry := curr.(*dict.MatchResult).Entry
+			if len(currEntry.Pair) <= 2 {
+				return m, nil
+			}
+			if key == "ctrl+up" || key == "ctrl+down" {
+				list := listManager.List()
+				if len(list) <= 1 {
+					return m, nil
+				}
+				log.Println("list: ", list)
+				var prev *dict.Entry = nil
+				var next *dict.Entry = nil
+				for i := 0; i < len(list); i++ {
+					entry := list[i].(*dict.MatchResult).Entry
+					if entry == currEntry {
+						if i+1 < len(list) {
+							prev = list[i+1].(*dict.MatchResult).Entry
+						}
+						if i-1 >= 0 {
+							next = list[i-1].(*dict.MatchResult).Entry
+						}
+						break
+					}
+				}
+				if key == "ctrl+up" && prev != nil {
+					currEntry.Weight = int(math.Max(1, float64(prev.Weight-1)))
+				}
+				if key == "ctrl+down" && next != nil {
+					currEntry.Weight = int(math.Max(1, float64(next.Weight+1)))
+				}
+			}
+			if key == "ctrl+left" {
+				currEntry.Weight = int(math.Max(1, float64(currEntry.Weight-1)))
+			}
+			if key == "ctrl+right" {
+				currEntry.Weight += 1
+			}
+			pair := make([]byte, 0)
+			pair = append(pair, currEntry.Pair[0]...)
+			pair = append(pair, '\t')
+			pair = append(pair, currEntry.Pair[1]...)
+			pair = append(pair, '\t')
+			pair = append(pair, strconv.Itoa(currEntry.Weight)...)
+			currEntry.ReRaw(pair)
+			listManager.ReSort()
+			list := listManager.List()
+
+			// 重新设置 listManager 的 currIndex为当前修改的项
+			for i, item := range list {
+				if item.(*dict.MatchResult).Entry == currEntry {
+					listManager.SetIndex(i)
+					break
+				}
+			}
+			return m, func() tea.Msg { return 0 } // trigger bubbletea update
+		},
+	}
+
+	// 显示帮助
+	showHelpEvent := &tui.Event{
+		Keys: []string{"ctrl+h"},
+		Cb: func(key string, m *tui.Model) (tea.Model, tea.Cmd) {
+			listManager.ShowingHelp = !listManager.ShowingHelp
+			return m, func() tea.Msg { return 0 } // trigger bubbletea update
+		},
+	}
+
 	// new model
 	events := []*tui.Event{
 		tui.MoveEvent,
@@ -194,6 +255,8 @@ func Start(opts *Options) {
 		tui.ClearInputEvent,
 		exitEvent,
 		exportDictEvent,
+		modifyWeightEvent,
+		showHelpEvent,
 	}
 	model := tui.NewModel(listManager, menuFetcher, events...)
 	teaProgram := tea.NewProgram(model)
@@ -230,7 +293,7 @@ func Start(opts *Options) {
 			case <-timer.C: // debounce, if appended then flush
 				if hasAppend {
 					hasAppend = false
-					teaProgram.Send(tui.FreshListMsg(0))
+					teaProgram.Send(0) // trigger bubbletea update
 				}
 			}
 		}
@@ -242,12 +305,11 @@ func Start(opts *Options) {
 	}
 }
 
-func FlushAndSync(opts *Options, dc *dict.Dictionary, ok bool) {
-	if !ok {
+func FlushAndSync(opts *Options, dc *dict.Dictionary, sync bool) {
+	if !sync {
 		return
 	}
-	dc.Flush()
-	if opts.RestartRimeCmd != "" {
+	if dc.Flush() && opts.RestartRimeCmd != "" {
 		// TODO: check RestartRimeCmd, if weasel updated, the program path may be changed
 		cmd := util.ExecCommand(opts.RestartRimeCmd, false)
 		err := cmd.Run()

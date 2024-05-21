@@ -65,6 +65,10 @@ var ClearInputEvent = &Event{
 var EnterEvent = &Event{
 	Keys: []string{"enter"},
 	Cb: func(_ string, m *Model) (tea.Model, tea.Cmd) {
+		if m.lm.ShowingHelp {
+			m.lm.ShowingHelp = false
+			return m, nil
+		}
 		if menus := m.menuFetcher(m.Modifying); m.ShowMenu && len(menus) > 0 {
 			if menu := menus[m.MenuIndex]; menu.Cb != nil {
 				return m, menu.Cb(m)

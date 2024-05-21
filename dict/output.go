@@ -30,7 +30,7 @@ func exportDict(path string, fes []*FileEntries) {
 	}
 }
 
-func output(fes []*FileEntries) {
+func output(fes []*FileEntries) (changed bool) {
 	var wg sync.WaitGroup
 	for _, fe := range fes {
 		if len(fe.Entries) == 0 {
@@ -42,10 +42,13 @@ func output(fes []*FileEntries) {
 			sort.Slice(fe.Entries, func(i, j int) bool {
 				return fe.Entries[i].seek < fe.Entries[j].seek
 			})
-			outputFile(fe.RawBs, fe.FilePath, fe.Entries)
+			if outputFile(fe.RawBs, fe.FilePath, fe.Entries) {
+				changed = true
+			}
 		}(fe)
 	}
 	wg.Wait()
+	return changed
 }
 
 func tryFatalf(err error, format string, args ...interface{}) {
@@ -54,8 +57,7 @@ func tryFatalf(err error, format string, args ...interface{}) {
 	}
 }
 
-func outputFile(rawBs []byte, path string, entries []*Entry) {
-	// log.Printf("rawBs now len %d\n", len(rawBs))
+func outputFile(rawBs []byte, path string, entries []*Entry) (changed bool) {
 	file, err := os.OpenFile(path, os.O_RDWR, 0666)
 	tryFatalf(err, "open File failed, Err:%v", err)
 	defer file.Close()
@@ -64,10 +66,11 @@ func outputFile(rawBs []byte, path string, entries []*Entry) {
 	willAddEntries := make([]*Entry, 0)
 	seekFixed := int64(0)
 	for _, entry := range entries {
+		if entry.saved || entry.modType == NC {
+			continue
+		}
 		var modType string
 		switch entry.modType {
-		case NC:
-			continue
 		case DELETE:
 			bs = append(bs[:entry.seek+seekFixed], bs[entry.seek+seekFixed+entry.rawSize:]...)
 			seekFixed = seekFixed - entry.rawSize
@@ -82,27 +85,25 @@ func outputFile(rawBs []byte, path string, entries []*Entry) {
 			willAddEntries = append(willAddEntries, entry)
 			modType = "ADD"
 		}
-		if entry.log {
-			log.Printf("modify dict type:%s | %s", modType, entry.String())
-			entry.Logged()
-		}
+		log.Printf("modify dict type:%s | %s", modType, entry.String())
+		changed = true
+		entry.Saved()
+	}
+	if !changed {
+		return
 	}
 	if len(willAddEntries) > 0 {
 		if bs[len(bs)-1] != '\n' {
 			bs = append(bs, '\n')
 		}
 		for _, entry := range willAddEntries {
-			nbs := entry.WriteLine()
-			nbs = append(nbs, '\n')
-			bs = append(bs, nbs...)
+			bs = append(bs, entry.WriteLine()...)
+			bs = append(bs, '\n')
 		}
 	}
 	l, err := file.Write(bs)
 	tryFatalf(err, "write File failed, Err:%v", err)
 	err = file.Truncate(int64(l))
 	tryFatalf(err, "truncate File failed, Err:%v", err)
-	//_, err = file.Seek(0, io.SeekStart)
-	//tryFatalf(err, "seek File failed, Err:%v", err)
-	//err = file.Sync()
-	//tryFatalf(err, "sync File failed, Err:%v", err)
+	return
 }

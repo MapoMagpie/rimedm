@@ -37,6 +37,7 @@ func (d *Dictionary) Entries() []*Entry {
 }
 
 func (d *Dictionary) Search(key []rune, resultChan chan<- []*MatchResult, ctx context.Context) {
+	log.Println("search key: ", string(key))
 	if len(key) == 0 {
 		done := false
 		go func() {
@@ -83,11 +84,14 @@ func (d *Dictionary) Len() int {
 	return len(d.entries)
 }
 
-func (d *Dictionary) Flush() {
+func (d *Dictionary) Flush() (changed bool) {
 	start := time.Now()
-	output(d.fileEntries)
+	changed = output(d.fileEntries)
 	since := time.Since(start)
-	log.Printf("flush dictionary: %v\n", since)
+	if changed {
+		log.Printf("flush dictionary: %v\n", since)
+	}
+	return changed
 }
 
 func (d *Dictionary) ExportDict(path string) {
@@ -114,7 +118,7 @@ type Entry struct {
 	seek    int64
 	rawSize int64
 	modType ModifyType
-	log     bool
+	saved   bool
 	Weight  int
 }
 
@@ -124,7 +128,7 @@ func (e *Entry) ReRaw(raw []byte) {
 	if e.modType != ADD {
 		e.modType = MODIFY
 	}
-	e.log = true
+	e.saved = false
 	e.Weight = 1
 	if len(e.Pair) >= 3 {
 		e.Weight, _ = strconv.Atoi(string(e.Pair[2]))
@@ -133,7 +137,7 @@ func (e *Entry) ReRaw(raw []byte) {
 
 func (e *Entry) Delete() {
 	e.modType = DELETE
-	e.log = true
+	e.saved = false
 }
 
 func (e *Entry) IsDelete() bool {
@@ -145,8 +149,8 @@ func (e *Entry) String() string {
 	return e.text.ToString()
 }
 
-func (e *Entry) Logged() {
-	e.log = false
+func (e *Entry) Saved() {
+	e.saved = true
 }
 
 func (e *Entry) WriteLine() []byte {
@@ -244,9 +248,11 @@ func NewEntry(raw []byte, refFile string, seek int64, size int64) *Entry {
 		text:    util.ToChars(raw),
 		Pair:    pair,
 		refFile: refFile,
+		modType: NC,
 		seek:    seek,
 		rawSize: size,
 		Weight:  weight,
+		saved:   true,
 	}
 }
 
@@ -261,7 +267,7 @@ func NewEntryAdd(raw []byte, refFile string) *Entry {
 		Pair:    pair,
 		refFile: refFile,
 		modType: ADD,
-		log:     true,
+		saved:   false,
 		Weight:  weight,
 	}
 }
