@@ -39,6 +39,10 @@ func Start(opts *Options) {
 		fileNames = append(fileNames, f)
 	}
 
+	searchChan := make(chan string, 20)
+	listManager := tui.NewListManager(searchChan)
+	listManager.SetFiles(fileNames)
+
 	// 添加菜单
 	menuNameAdd := tui.Menu{Name: "Add", Cb: func(m *tui.Model) (cmd tea.Cmd) {
 		if len(m.Inputs) == 0 {
@@ -56,6 +60,32 @@ func Start(opts *Options) {
 		pair := dict.ParseInput(raw)
 		if pair[1] == "" {
 			return tui.ExitMenuCmd
+		}
+		if pair[2] == "" {
+			curr, err := listManager.Curr()
+			// list := listManager.List()
+			// if err == nil && len(list) > 0 {
+			// 	sameCodeList := make([]*dict.Entry, 0)
+			// 	currEntry := curr.(*dict.MatchResult).Entry
+			// 	currEntryIndex := -1
+			// 	for _, item := range list {
+			// 		entry := item.(*dict.MatchResult)
+			// 		if len(entry.Entry.Pair) >= 3 && string(entry.Entry.Pair[1]) == pair[1] && len(entry.Entry.Pair[2]) > 0 { // 过滤掉码不相同的以及没有权重的
+			// 			sameCodeList = append(sameCodeList, entry.Entry)
+			// 		}
+			// 	}
+			// 	if currEntryIndex > -1 {
+			// 		pair[2] = fmt.Sprintf("%d", currEntry.Weight-1)
+			// 	}
+			// 	log.Println("curr entry: ", currEntry, ", same code list: ", sameCodeList)
+			// }
+			if err == nil {
+				currEntry := curr.(*dict.MatchResult).Entry
+				if string(currEntry.Pair[1]) == pair[1] && len(currEntry.Pair) >= 3 && len(currEntry.Pair[2]) > 0 {
+					pair[2] = fmt.Sprintf("%d", currEntry.Weight-1)
+					log.Println("curr entry: ", currEntry, ", new Entry pair: ", pair)
+				}
+			}
 		}
 		filePath := file.String()
 		dc.Add(dict.NewEntryAdd([]byte(strings.Join(pair[:], "\t")), filePath))
@@ -157,9 +187,7 @@ func Start(opts *Options) {
 		},
 	}
 
-	searchChan := make(chan string, 20)
-	listManager := tui.NewListManager(searchChan)
-	listManager.SetFiles(fileNames)
+	// new model
 	events := []*tui.Event{
 		tui.MoveEvent,
 		tui.EnterEvent,
