@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 
 type Dictionary struct {
 	matcher     Matcher
+	entries     []*Entry
 	fileEntries []*FileEntries
 }
 
@@ -19,18 +21,19 @@ func NewDictionary(fes []*FileEntries, matcher Matcher) *Dictionary {
 	if matcher == nil {
 		matcher = &CacheMatcher{}
 	}
+	entries := make([]*Entry, 0)
+	for _, fe := range fes {
+		entries = append(entries, fe.Entries...)
+	}
 	return &Dictionary{
-		fileEntries: fes,
 		matcher:     matcher,
+		entries:     entries,
+		fileEntries: fes,
 	}
 }
 
 func (d *Dictionary) Entries() []*Entry {
-	entries := make([]*Entry, 0)
-	for _, fe := range d.fileEntries {
-		entries = append(entries, fe.Entries...)
-	}
-	return entries
+	return d.entries
 }
 
 func (d *Dictionary) Search(key []rune, resultChan chan<- []*MatchResult, ctx context.Context) {
@@ -41,14 +44,19 @@ func (d *Dictionary) Search(key []rune, resultChan chan<- []*MatchResult, ctx co
 			done = true
 		}()
 		list := d.Entries()
+		deleteCount := 0
 		ret := make([]*MatchResult, len(list))
 		for i, entry := range list {
 			if done {
 				return
 			}
-			ret[i] = &MatchResult{Entry: entry}
+			if entry.IsDelete() {
+				deleteCount += 1
+				continue
+			}
+			ret[i-deleteCount] = &MatchResult{Entry: entry}
 		}
-		resultChan <- ret
+		resultChan <- ret[0 : len(ret)-deleteCount]
 	} else {
 		d.matcher.Search(key, d.Entries(), resultChan, ctx)
 	}
@@ -60,6 +68,7 @@ func (d *Dictionary) Add(entry *Entry) {
 			fe.Entries = append(fe.Entries, entry)
 		}
 	}
+	d.entries = append(d.entries, entry)
 }
 
 func (d *Dictionary) Delete(entry *Entry) {
@@ -71,11 +80,7 @@ func (d *Dictionary) ResetMatcher() {
 }
 
 func (d *Dictionary) Len() int {
-	le := 0
-	for _, fe := range d.fileEntries {
-		le = le + len(fe.Entries)
-	}
-	return le
+	return len(d.entries)
 }
 
 func (d *Dictionary) Flush() {
@@ -110,6 +115,7 @@ type Entry struct {
 	rawSize int64
 	modType ModifyType
 	log     bool
+	Weight  int
 }
 
 func (e *Entry) ReRaw(raw []byte) {
@@ -119,6 +125,10 @@ func (e *Entry) ReRaw(raw []byte) {
 		e.modType = MODIFY
 	}
 	e.log = true
+	e.Weight = 1
+	if len(e.Pair) >= 3 {
+		e.Weight, _ = strconv.Atoi(string(e.Pair[2]))
+	}
 }
 
 func (e *Entry) Delete() {
@@ -172,6 +182,7 @@ func ParseInput(raw string) (pair [3]string) {
 		if isAscii(item) {
 			pair[1] = item
 		} else {
+			// 表(汉字)的输入可能包含空格，类似 "富强 强国"，因此在splited后重新拼接起来。
 			space := " "
 			if pair[0] == "" {
 				space = ""
@@ -224,21 +235,33 @@ func ParsePair(raw []byte) [][]byte {
 }
 
 func NewEntry(raw []byte, refFile string, seek int64, size int64) *Entry {
+	pair := ParsePair(raw)
+	weight := 1
+	if len(pair) >= 3 {
+		weight, _ = strconv.Atoi(string(pair[2]))
+	}
 	return &Entry{
 		text:    util.ToChars(raw),
-		Pair:    ParsePair(raw),
+		Pair:    pair,
 		refFile: refFile,
 		seek:    seek,
 		rawSize: size,
+		Weight:  weight,
 	}
 }
 
 func NewEntryAdd(raw []byte, refFile string) *Entry {
+	pair := ParsePair(raw)
+	weight := 1
+	if len(pair) >= 3 {
+		weight, _ = strconv.Atoi(string(pair[2]))
+	}
 	return &Entry{
 		text:    util.ToChars(raw),
-		Pair:    ParsePair(raw),
+		Pair:    pair,
 		refFile: refFile,
 		modType: ADD,
 		log:     true,
+		Weight:  weight,
 	}
 }

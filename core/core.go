@@ -41,27 +41,29 @@ func Start(opts *Options) {
 
 	// 添加菜单
 	menuNameAdd := tui.Menu{Name: "Add", Cb: func(m *tui.Model) (cmd tea.Cmd) {
-		if len(m.Inputs) > 0 {
-			file, err := m.CurrFile()
-			if err != nil {
-				log.Fatalf("add to dict error: %v", err)
-				return
-			}
-			raw := strings.TrimSpace(strings.Join(m.Inputs, ""))
-			if raw == "" {
-				return
-			}
-			pair := dict.ParseInput(raw)
-			if pair[1] != "" {
-				filePath := file.String()
-				dc.ResetMatcher()
-				dc.Add(dict.NewEntryAdd([]byte(strings.Join(pair[:], "\t")), filePath))
-				log.Printf("add item: %s\n", pair)
-				m.Inputs = []string{}
-				m.InputCursor = 0
-				FlushAndSync(opts, dc, opts.SyncOnChange)
-			}
+		if len(m.Inputs) == 0 {
+			return tui.ExitMenuCmd
 		}
+		file, err := m.CurrFile()
+		if err != nil {
+			log.Fatalf("add to dict error: %v", err)
+			return
+		}
+		raw := strings.TrimSpace(strings.Join(m.Inputs, ""))
+		if raw == "" {
+			return
+		}
+		pair := dict.ParseInput(raw)
+		if pair[1] == "" {
+			return tui.ExitMenuCmd
+		}
+		filePath := file.String()
+		dc.Add(dict.NewEntryAdd([]byte(strings.Join(pair[:], "\t")), filePath))
+		log.Printf("add item: %s\n", pair)
+		m.Inputs = strings.Split(pair[1], "")
+		m.InputCursor = len(m.Inputs)
+		dc.ResetMatcher()
+		FlushAndSync(opts, dc, opts.SyncOnChange)
 		return tui.ExitMenuCmd
 	}}
 
@@ -75,9 +77,9 @@ func Start(opts *Options) {
 		}
 		switch item := item.(type) {
 		case *dict.MatchResult:
-			dc.ResetMatcher()
 			dc.Delete(item.Entry)
 			log.Printf("delete item: %s\n", item)
+			dc.ResetMatcher()
 			FlushAndSync(opts, dc, opts.SyncOnChange)
 		}
 		return tui.ExitMenuCmd
@@ -103,12 +105,17 @@ func Start(opts *Options) {
 	// 确认修改菜单
 	menuNameConfirm := tui.Menu{Name: "Confirm", Cb: func(m *tui.Model) tea.Cmd {
 		m.Modifying = false
-		str := strings.Join(m.Inputs, "")
+		raw := strings.Join(m.Inputs, "")
 		switch item := modifyingItem.(type) {
 		case *dict.MatchResult:
 			log.Printf("modify confirm item: %s\n", item)
+			pair := dict.ParseInput(raw)
+			if pair[1] != "" {
+				item.Entry.ReRaw([]byte(strings.Join(pair[:], "\t")))
+				m.Inputs = strings.Split(pair[1], "")
+				m.InputCursor = len(m.Inputs)
+			}
 			dc.ResetMatcher()
-			item.Entry.ReRaw([]byte(str))
 			FlushAndSync(opts, dc, opts.SyncOnChange)
 		}
 		return tui.ExitMenuCmd
@@ -153,13 +160,20 @@ func Start(opts *Options) {
 	searchChan := make(chan string, 20)
 	listManager := tui.NewListManager(searchChan)
 	listManager.SetFiles(fileNames)
-	model := tui.NewModel(listManager, menuFetcher, tui.MoveEvent, tui.EnterEvent, tui.ClearInputEvent, exitEvent, exportDictEvent)
+	events := []*tui.Event{
+		tui.MoveEvent,
+		tui.EnterEvent,
+		tui.ClearInputEvent,
+		exitEvent,
+		exportDictEvent,
+	}
+	model := tui.NewModel(listManager, menuFetcher, events...)
 	teaProgram := tea.NewProgram(model)
 
 	go func() {
 		var cancelFunc context.CancelFunc
-		ch := make(chan []*dict.MatchResult)
-		timer := time.NewTicker(time.Millisecond * 100)
+		resultChan := make(chan []*dict.MatchResult)
+		timer := time.NewTicker(time.Millisecond * 100) // debounce
 		hasAppend := false
 		for {
 			select {
@@ -177,8 +191,8 @@ func Start(opts *Options) {
 						rs = []rune(pair[1])
 					}
 				}
-				go dc.Search(rs, ch, ctx)
-			case ret := <-ch:
+				go dc.Search(rs, resultChan, ctx)
+			case ret := <-resultChan:
 				if len(ret) > 0 {
 					list := make([]tui.ItemRender, len(ret))
 					for i, entry := range ret {
@@ -187,7 +201,7 @@ func Start(opts *Options) {
 					listManager.AppendList(list)
 					hasAppend = true
 				}
-			case <-timer.C:
+			case <-timer.C: // debounce, if appended then flush
 				if hasAppend {
 					hasAppend = false
 					teaProgram.Send(tui.FreshListMsg(0))

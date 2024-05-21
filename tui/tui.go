@@ -3,7 +3,6 @@ package tui
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"sort"
 	"strings"
@@ -79,9 +78,9 @@ func (l *ListManager) NewList() {
 }
 
 func (l *ListManager) newSearch(inputs []string) {
-	log.Printf("send search key: %v", strings.Join(inputs, ""))
+	// log.Printf("send search key: %v", strings.Join(inputs, ""))
 	l.SearchChan <- strings.Join(inputs, "")
-	log.Printf("send search key finshed")
+	// log.Printf("send search key finshed")
 }
 
 func (l *ListManager) AppendList(rs []ItemRender) {

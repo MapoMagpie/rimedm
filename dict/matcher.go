@@ -18,7 +18,7 @@ func (m *MatchResult) String() string {
 
 func (m *MatchResult) Order() int {
 	score := m.result.Score
-	score = score * (200 - m.Entry.text.Length())
+	score = score * (200 * m.Entry.Weight) * (1000 - m.Entry.text.Length())
 	return score
 }
 
@@ -73,13 +73,13 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*Ma
 	listLen := len(list)
 	chunkSize := 50000 // chunkSize = listLen means no async search
 	for idx, entry := range list {
+		if done {
+			return
+		}
 		if entry.modType == DELETE {
 			continue
 		}
 		result, _ := algo.FuzzyMatchV2(false, true, true, &entry.text, key, false, slab)
-		if done {
-			return
-		}
 		if result.Score > 0 {
 			matched = append(matched, &MatchResult{entry, result})
 		}

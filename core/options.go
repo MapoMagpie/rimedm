@@ -15,7 +15,7 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
-var version = "1.0.5"
+var version = "1.0.6"
 
 type Options struct {
 	RestartRimeCmd string   `yaml:"restart_rime_cmd"`
