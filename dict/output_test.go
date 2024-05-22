@@ -2,8 +2,8 @@ package dict
 
 import (
 	"bytes"
+	"fmt"
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -33,57 +33,145 @@ func Test_Entry_WriteLine(t *testing.T) {
 	}
 }
 
-func Test_output(t *testing.T) {
-	filename := mockFile()
+func Test_outputFile(t *testing.T) {
+	os.MkdirAll("./tmp", os.ModePerm)
 	defer os.RemoveAll("./tmp")
-	fes := LoadItems(filename)
-	content := `
+	content1 := `
 ---
 name: xkjd6.whatever
-version: "Q1"
-sort: original
 ...
 早早	zzzzmod
 早早	zzzz
 测试	ceek
-`
-	type args struct {
-		fe *FileEntries
-	}
+  `
+	content1_want1 := `
+---
+name: xkjd6.whatever
+...
+早早	zzzz
+测试	ceek
+  `
+
+	content1_want2 := `
+---
+name: xkjd6.whatever
+...
+早早	zzzz
+  `
+	content1_want3 := `
+---
+name: xkjd6.whatever
+...
+早早	zaozao
+测试	ceshi
+  `
+	content1_want4 := `
+---
+name: xkjd6.whatever
+...
+早早	zaozao
+  `
 	tests := []struct {
-		args args
-		name string
-		want string
+		fe            *FileEntries
+		name          string
+		want          string
+		filename      string
+		shouldChanged bool
 	}{
 		{
-			name: "case1",
-			args: func() args {
-				var fe *FileEntries
-				for _, f := range fes {
-					if strings.Contains(f.FilePath, "rime.cizu2.dict.yaml") {
-						fe = f
-					}
-				}
-				if fe == nil {
-					panic("file not found: rime.cizu2.dict.yaml")
-				}
+			name: "delete some 1",
+			fe: func() *FileEntries {
+				filename := createFile("./tmp/test_outputfile1.yaml", content1)
+				fe := LoadItems(filename)[0]
 				fe.Entries[0].Delete()
-				fe.Entries[1].ReRaw(append(fe.Entries[2].WriteLine(), []byte{'m', 'o', 'd'}...))
-				fe.Entries = append(fe.Entries, NewEntryAdd([]byte("测试\tceek"), fe.FilePath))
-				return args{fe}
+				return fe
 			}(),
-			want: content,
+			want:          content1_want1,
+			shouldChanged: true,
+			filename:      "./tmp/test_outputfile1.yaml",
+		},
+		{
+			name: "delete some 2",
+			fe: func() *FileEntries {
+				filename := createFile("./tmp/test_outputfile2.yaml", content1)
+				fe := LoadItems(filename)[0]
+				fe.Entries[0].Delete()
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				fe.Entries[2].Delete()
+				return fe
+			}(),
+			want:          content1_want2,
+			shouldChanged: true,
+			filename:      "./tmp/test_outputfile2.yaml",
+		},
+		{
+			name: "delete 1 mod 2",
+			fe: func() *FileEntries {
+				filename := createFile("./tmp/test_outputfile3.yaml", content1)
+				fe := LoadItems(filename)[0]
+				fe.Entries[0].Delete()
+				fe.Entries[1].ReRaw([]byte("早早\tzaozao"))
+				fe.Entries[2].ReRaw([]byte("测试\tceshi"))
+				return fe
+			}(),
+			want:          content1_want3,
+			shouldChanged: true,
+			filename:      "./tmp/test_outputfile3.yaml",
+		},
+		{
+			name: "delete 1 mod 2 output multiple times",
+			fe: func() *FileEntries {
+				filename := createFile("./tmp/test_outputfile4.yaml", content1)
+				fe := LoadItems(filename)[0]
+				fe.Entries[0].Delete()
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				fmt.Println("---------------")
+				fe.Entries[1].ReRaw([]byte("早早\tzaozao"))
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				fmt.Println("---------------")
+				fe.Entries[2].ReRaw([]byte("测试\tceshi"))
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				fmt.Println("---------------")
+				return fe
+			}(),
+			want:          content1_want3,
+			shouldChanged: false,
+			filename:      "./tmp/test_outputfile4.yaml",
+		},
+		{
+			name: "delete and output multiple times",
+			fe: func() *FileEntries {
+				filename := createFile("./tmp/test_outputfile5.yaml", content1)
+				fe := LoadItems(filename)[0]
+				fe.Entries[0].Delete()
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				fmt.Println("---------------")
+				fe.Entries[2].Delete()
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				fmt.Println("---------------")
+				return fe
+			}(),
+			want:          content1_want4,
+			shouldChanged: false,
+			filename:      "./tmp/test_outputfile5.yaml",
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(_ *testing.T) {
-			output([]*FileEntries{tt.args.fe})
-			c, err := os.ReadFile("./tmp/rime.cizu2.dict.yaml")
+			changed := outputFile(&tt.fe.RawBs, tt.fe.FilePath, tt.fe.Entries)
+			c, err := os.ReadFile(tt.filename)
 			if err != nil {
 				panic(err)
 			}
 			if string(c) != tt.want {
-				t.Errorf("output() = %v, want %v", string(c), tt.want)
+				t.Errorf("case:%v\n%v\nwant\n%v", tt.name, string(c), tt.want)
+			}
+			if string(tt.fe.RawBs) != tt.want {
+				t.Errorf("case:%v\nfe.RawBs\n%v\nwant\n%v", tt.name, string(tt.fe.RawBs), tt.want)
+			}
+			if tt.shouldChanged != changed {
+				t.Errorf("case:%v, changed: %v, want: %v", tt.name, changed, tt.shouldChanged)
 			}
 		})
 	}

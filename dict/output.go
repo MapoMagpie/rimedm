@@ -42,7 +42,7 @@ func output(fes []*FileEntries) (changed bool) {
 			sort.Slice(fe.Entries, func(i, j int) bool {
 				return fe.Entries[i].seek < fe.Entries[j].seek
 			})
-			if outputFile(fe.RawBs, fe.FilePath, fe.Entries) {
+			if outputFile(&fe.RawBs, fe.FilePath, fe.Entries) {
 				changed = true
 			}
 		}(fe)
@@ -57,28 +57,28 @@ func tryFatalf(err error, format string, args ...interface{}) {
 	}
 }
 
-func outputFile(rawBs []byte, path string, entries []*Entry) (changed bool) {
+func outputFile(rawBs *[]byte, path string, entries []*Entry) (changed bool) {
 	file, err := os.OpenFile(path, os.O_RDWR, 0666)
 	tryFatalf(err, "open File failed, Err:%v", err)
 	defer file.Close()
-	bs := make([]byte, len(rawBs))
-	copy(bs, rawBs)
+	bs := *rawBs
 	willAddEntries := make([]*Entry, 0)
 	seekFixed := int64(0)
 	for _, entry := range entries {
+		entry.seek += seekFixed
 		if entry.saved || entry.modType == NC {
 			continue
 		}
 		var modType string
 		switch entry.modType {
 		case DELETE:
-			bs = append(bs[:entry.seek+seekFixed], bs[entry.seek+seekFixed+entry.rawSize:]...)
+			bs = append(bs[:entry.seek], bs[entry.seek+entry.rawSize:]...)
 			seekFixed = seekFixed - entry.rawSize
 			modType = "DELETE"
 		case MODIFY:
 			nbs := entry.WriteLine()
 			nbs = append(nbs, '\n')
-			bs = append(bs[:entry.seek+seekFixed], append(nbs, bs[entry.seek+seekFixed+entry.rawSize:]...)...)
+			bs = append(bs[:entry.seek], append(nbs, bs[entry.seek+entry.rawSize:]...)...)
 			seekFixed = seekFixed - entry.rawSize + int64(len(nbs))
 			modType = "MODIFY"
 		case ADD:
@@ -101,6 +101,7 @@ func outputFile(rawBs []byte, path string, entries []*Entry) (changed bool) {
 			bs = append(bs, '\n')
 		}
 	}
+	*rawBs = bs
 	l, err := file.Write(bs)
 	tryFatalf(err, "write File failed, Err:%v", err)
 	err = file.Truncate(int64(l))

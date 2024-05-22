@@ -133,6 +133,7 @@ func (e *Entry) ReRaw(raw []byte) {
 	if len(e.Pair) >= 3 {
 		e.Weight, _ = strconv.Atoi(string(e.Pair[2]))
 	}
+	// don't change rawSize
 }
 
 func (e *Entry) Delete() {
@@ -151,6 +152,9 @@ func (e *Entry) String() string {
 
 func (e *Entry) Saved() {
 	e.saved = true
+	if e.modType == MODIFY {
+		e.rawSize = int64(len(e.WriteLine())) + 1 // + 1 for '\n'
+	}
 }
 
 func (e *Entry) WriteLine() []byte {
