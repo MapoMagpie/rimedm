@@ -76,20 +76,20 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*Ma
 		if done {
 			return
 		}
-		if entry.modType == DELETE {
-			continue
-		}
-		result, _ := algo.FuzzyMatchV2(false, true, true, &entry.text, key, false, slab)
-		if result.Score > 0 {
-			matched = append(matched, &MatchResult{entry, result})
+		if entry.modType != DELETE {
+			result, _ := algo.FuzzyMatchV2(false, true, true, &entry.text, key, false, slab)
+			if result.Score > 0 {
+				matched = append(matched, &MatchResult{entry, result})
+			}
 		}
 		if (idx%chunkSize == 0 && idx != 0) || idx == listLen-1 {
 			m2 := matched[lastIdx:]
 			resultChan <- m2
+			// log.Printf("Cache Matcher Search: Key: %s, Send result: %d", string(key), len(m2))
 			lastIdx = len(matched)
 		}
 	}
-
+	// log.Printf("Cache Matcher Search: Key: %s, List Len: %d, Cached: %v, Matched: %d", string(key), listLen, cache != nil, len(matched))
 	if m.cache == nil {
 		m.cache = make(map[string][]*MatchResult)
 	}

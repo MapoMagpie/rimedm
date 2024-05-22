@@ -289,6 +289,7 @@ func Start(opts *Options) {
 					list[i] = entry
 				}
 				listManager.AppendList(list)
+				// log.Println("list manager append list: ", len(list))
 				hasAppend = true
 			case <-timer.C: // debounce, if appended then flush
 				if hasAppend {
