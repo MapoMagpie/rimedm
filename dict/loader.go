@@ -44,8 +44,8 @@ func LoadItems(paths ...string) (fes []*FileEntries) {
 	fileNames := make(map[string]bool)
 	for fe := range ch {
 		if fe.Err != nil {
-			log.Printf("load [%s] error: %s", fe.FilePath, fe.Err)
-			continue
+			fmt.Println("load dict file error: ", fe.Err)
+			os.Exit(0)
 		}
 		if _, ok := fileNames[fe.FilePath]; ok {
 			log.Printf("file [%s] already loaded", fe.FilePath)
