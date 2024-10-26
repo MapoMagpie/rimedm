@@ -18,7 +18,8 @@ func (m *MatchResult) String() string {
 
 func (m *MatchResult) Order() int {
 	score := m.result.Score
-	score = score * (200 * m.Entry.Weight) * (1000 - m.Entry.text.Length())
+	score = score * (1000 - m.Entry.text.Length())
+	// * (10 * m.Entry.Weight)
 	return score
 }
 
@@ -35,7 +36,7 @@ func (m *CacheMatcher) Reset() {
 	m.cache = nil
 }
 
-var slab = util.MakeSlab(100*1024, 2048)
+// var slab = util.MakeSlab(200*1024, 4096)
 
 func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*MatchResult, ctx context.Context) {
 	var done bool
@@ -69,6 +70,7 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*Ma
 	}
 
 	matched := make([]*MatchResult, 0)
+	var slab = util.MakeSlab(200*1024, 4096)
 	lastIdx := 0
 	listLen := len(list)
 	chunkSize := 50000 // chunkSize = listLen means no async search
