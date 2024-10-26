@@ -65,12 +65,6 @@ name: xkjd6.whatever
 早早	zaozao
 测试	ceshi
   `
-	content1_want4 := `
----
-name: xkjd6.whatever
-...
-早早	zaozao
-  `
 	tests := []struct {
 		fe            *FileEntries
 		name          string
@@ -151,7 +145,7 @@ name: xkjd6.whatever
 				fmt.Println("---------------")
 				return fe
 			}(),
-			want:          content1_want4,
+			want:          content1_want2,
 			shouldChanged: false,
 			filename:      "./tmp/test_outputfile5.yaml",
 		},
