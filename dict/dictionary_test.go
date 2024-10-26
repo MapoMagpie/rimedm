@@ -75,7 +75,8 @@ func Test_ParseInput(t *testing.T) {
 		{"case7", args{"nau 你好 1"}, [3]string{"你好", "nau", "1"}},
 		{"case8", args{"  nau 你好 1 "}, [3]string{"你好", "nau", "1"}},
 		{"case9", args{"nau hi你好ya 1 "}, [3]string{"hi你好ya", "nau", "1"}},
-		{"case10", args{"nau hi 你好 ya 1i "}, [3]string{"你好", "1i", ""}},
+		{"case10", args{"nau 1 hi 你好 ya 1i "}, [3]string{"你好", "ya 1i", "1"}},
+		{"case10", args{"你好 ni hao 1"}, [3]string{"你好", "ni hao", "1"}},
 	}
 	fields := strings.Fields("你\t好")
 	fmt.Println(fields, len(fields))
@@ -131,6 +132,11 @@ func Test_ParsePair(t *testing.T) {
 			name: "case7",
 			args: args{"你 好\t \tnau              \t1"},
 			want: []string{"你 好", "nau", "1"},
+		},
+		{
+			name: "case8",
+			args: args{"你好\t \tni hao\t1"},
+			want: []string{"你好", "ni hao", "1"},
 		},
 	}
 	for _, tt := range tests {

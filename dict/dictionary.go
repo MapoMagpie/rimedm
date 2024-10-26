@@ -178,25 +178,36 @@ func ParseInput(raw string) (pair [3]string) {
 	pair = [3]string{}
 	// split by '\t' or ' '
 	splits := strings.Fields(raw)
+	lastType := 1 // 1: number 2:ascii 3:汉字
 	for i := 0; i < len(splits); i++ {
 		item := strings.TrimSpace(splits[i])
 		if len(item) == 0 {
 			continue
 		}
 		if isNumber(item) {
-			pair[2] = item
+			if lastType == 1 {
+				pair[2] = pair[2] + " " + item
+			} else {
+				pair[2] = item
+			}
+			lastType = 1
 			continue
 		}
 		if isAscii(item) {
-			pair[1] = item
-		} else {
-			// 表(汉字)的输入可能包含空格，类似 "富强 强国"，因此在splited后重新拼接起来。
-			space := " "
-			if pair[0] == "" {
-				space = ""
+			if lastType == 2 {
+				pair[1] = pair[1] + " " + item
+			} else {
+				pair[1] = item
 			}
-			pair[0] = pair[0] + space + item
+			lastType = 2
+			continue
 		}
+		// 表(汉字)的输入可能包含空格，类似 "富强 强国"，因此在splited后重新拼接起来。
+		pair[0] = pair[0] + " " + item
+		lastType = 3
+	}
+	for i := 0; i < len(pair); i++ {
+		pair[i] = strings.TrimSpace(pair[i])
 	}
 	return
 }
