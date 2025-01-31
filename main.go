@@ -6,6 +6,9 @@ import (
 
 	core "github.com/MapoMagpie/rimedm/core"
 	tea "github.com/charmbracelet/bubbletea"
+
+	// "net/http"
+	// _ "net/http/pprof"
 )
 
 func main() {
@@ -14,6 +17,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("log to file err : %s", err)
 	}
+	// go func() {
+	// 	http.ListenAndServe("localhost:10080", nil)
+	// }()
 	defer func() {
 		_ = f.Close()
 	}()
