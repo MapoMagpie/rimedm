@@ -1,8 +1,4 @@
-/config/debug.log
-/.idea
-/rimedi*
+config
+rime
+dist
 rimedm
-rimedm.exe
-rime/
-
-dist/
