@@ -36,7 +36,7 @@
           pname = "rimedm";
           version = "1.0.10";
           src = ./.;
-          vendorHash = null;
+          vendorHash = "sha256-479pI3pOTaOiAcqvY3OLJyzSBoi9AgzwaHBB2EhoeoE=";
         };
       });
 
