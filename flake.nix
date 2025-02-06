@@ -25,6 +25,7 @@
           packages = with pkgsFor.${system}; [
             go
             gopls
+            golangci-lint
             golangci-lint-langserver
           ];
           shellHook = "exec zsh";

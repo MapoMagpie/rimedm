@@ -65,7 +65,7 @@ func ParseOptions() (Options, string) {
 		opts.SyncOnChange = false
 	}
 
-	if opts.DictPaths == nil || len(opts.DictPaths) == 0 {
+	if len(opts.DictPaths) == 0 {
 		log.Fatalf("未指定词典文件，请检查配置文件[%s]或通过 -d 指定词典文件", configPath)
 	}
 

@@ -34,7 +34,7 @@ func Test_Entry_WriteLine(t *testing.T) {
 }
 
 func Test_outputFile(t *testing.T) {
-	os.MkdirAll("./tmp", os.ModePerm)
+	_ = os.MkdirAll("./tmp", os.ModePerm)
 	defer os.RemoveAll("./tmp")
 	content1 := `
 ---
