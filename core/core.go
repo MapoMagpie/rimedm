@@ -6,8 +6,8 @@ import (
 	"log"
 	"math"
 	"os"
+	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -31,14 +31,12 @@ func Start(opts *Options) {
 
 	// collect file name, will show on addition
 	fileNames := make([]tui.ItemRender, 0)
-	if opts.UserPath != "" {
-		fileNames = append(fileNames, &dict.FileEntries{FilePath: opts.UserPath})
-	}
-	for _, f := range dc.Files() {
-		if f.FilePath == opts.UserPath {
-			continue
+	for _, fe := range fes {
+		if fe.FilePath == opts.UserPath {
+			fileNames = append([]tui.ItemRender{fe}, fileNames...)
+		} else {
+			fileNames = append(fileNames, fe)
 		}
-		fileNames = append(fileNames, f)
 	}
 
 	searchChan := make(chan string, 20)
@@ -59,24 +57,25 @@ func Start(opts *Options) {
 		if raw == "" {
 			return
 		}
-		pair := dict.ParseInput(raw)
-		if pair[1] == "" {
+		pair, cols := dict.ParseInput(raw)
+		if len(pair) == 0 {
 			return tui.ExitMenuCmd
 		}
-		if pair[2] == "" {
-			curr, err := listManager.Curr()
-			if err == nil {
-				currEntry := curr.(*dict.MatchResult).Entry
-				if string(currEntry.Pair[1]) == pair[1] && len(currEntry.Pair) >= 3 && len(currEntry.Pair[2]) > 0 {
-					pair[2] = fmt.Sprintf("%d", currEntry.Weight-1)
-					log.Println("curr entry: ", currEntry, ", new Entry pair: ", pair)
-				}
+		data, _ := dict.ParseData(pair, cols)
+		curr, err := listManager.Curr()
+		if err == nil {
+			// 自动修改权重
+			currEntry := curr.(*dict.MatchResult).Entry
+			currEntryData := currEntry.Data()
+			if currEntryData.Code == data.Code && data.Weight == 0 { // 新加项的码如果和当前项的码相同，则自动修改新加项的权重
+				data.Weight = currEntryData.Weight + 1
+				// log.Println("curr entry: ", currEntry, ", new Entry pair: ", pairs)
 			}
 		}
-		filePath := file.String()
-		dc.Add(dict.NewEntryAdd([]byte(strings.Join(pair[:], "\t")), filePath))
+		fe := file.(*dict.FileEntries)
+		dc.Add(dict.NewEntryAdd(data.ToBytesWithColumns(fe.Columns), fe.ID))
 		log.Printf("add item: %s\n", pair)
-		m.Inputs = strings.Split(pair[1], "")
+		m.Inputs = strings.Split(data.Code, "")
 		m.InputCursor = len(m.Inputs)
 		dc.ResetMatcher()
 		FlushAndSync(opts, dc, opts.SyncOnChange)
@@ -124,11 +123,17 @@ func Start(opts *Options) {
 		raw := strings.Join(m.Inputs, "")
 		switch item := modifyingItem.(type) {
 		case *dict.MatchResult:
-			log.Printf("modify confirm item: %s\n", item)
-			pair := dict.ParseInput(raw)
-			if pair[1] != "" {
-				item.Entry.ReRaw([]byte(strings.Join(pair[:], "\t")))
-				m.Inputs = strings.Split(pair[1], "")
+			pair, cols := dict.ParseInput(raw)
+			if len(pair) > 1 {
+				data, _ := dict.ParseData(pair, cols)
+				feIndex := slices.IndexFunc(fes, func(fe *dict.FileEntries) bool {
+					return fe.ID == item.Entry.FID
+				})
+				if feIndex > -1 {
+					item.Entry.ReRaw(data.ToBytesWithColumns(fes[feIndex].Columns))
+					log.Printf("modify confirm item: %s\n", item)
+				}
+				m.Inputs = strings.Split(data.Code, "")
 				m.InputCursor = len(m.Inputs)
 			}
 			dc.ResetMatcher()
@@ -181,58 +186,63 @@ func Start(opts *Options) {
 			if err != nil {
 				return m, nil
 			}
+			changed := false
 			currEntry := curr.(*dict.MatchResult).Entry
-			if len(currEntry.Pair) <= 2 {
-				return m, nil
-			}
+			currEntryData := currEntry.Data()
 			if key == "ctrl+up" || key == "ctrl+down" {
 				list := listManager.List()
 				if len(list) <= 1 {
 					return m, nil
 				}
-				log.Println("list: ", list)
+				// log.Println("list: ", list)
 				var prev *dict.Entry = nil
 				var next *dict.Entry = nil
 				for i := 0; i < len(list); i++ {
 					entry := list[i].(*dict.MatchResult).Entry
 					if entry == currEntry {
 						if i+1 < len(list) {
-							prev = list[i+1].(*dict.MatchResult).Entry
+							next = list[i+1].(*dict.MatchResult).Entry
 						}
 						if i-1 >= 0 {
-							next = list[i-1].(*dict.MatchResult).Entry
+							prev = list[i-1].(*dict.MatchResult).Entry
 						}
 						break
 					}
 				}
-				if key == "ctrl+up" && prev != nil {
-					currEntry.Weight = int(math.Max(1, float64(prev.Weight-1)))
+				if key == "ctrl+up" && next != nil {
+					currEntryData.Weight = int(math.Max(1, float64(next.Data().Weight+1)))
+					changed = true
 				}
-				if key == "ctrl+down" && next != nil {
-					currEntry.Weight = int(math.Max(1, float64(next.Weight+1)))
+				if key == "ctrl+down" && prev != nil {
+					currEntryData.Weight = int(math.Max(1, float64(prev.Data().Weight-1)))
+					changed = true
 				}
 			}
 			if key == "ctrl+left" {
-				currEntry.Weight = int(math.Max(1, float64(currEntry.Weight-1)))
+				currEntryData.Weight = int(math.Max(1, float64(currEntryData.Weight-1)))
+				changed = true
 			}
 			if key == "ctrl+right" {
-				currEntry.Weight += 1
+				currEntryData.Weight = int(math.Max(1, float64(currEntryData.Weight+1)))
+				changed = true
 			}
-			pair := make([]byte, 0)
-			pair = append(pair, currEntry.Pair[0]...)
-			pair = append(pair, '\t')
-			pair = append(pair, currEntry.Pair[1]...)
-			pair = append(pair, '\t')
-			pair = append(pair, strconv.Itoa(currEntry.Weight)...)
-			currEntry.ReRaw(pair)
-			listManager.ReSort()
-			list := listManager.List()
+			// pair := make([]byte, 0)
+			// pair = append(pair, currEntry.Pair[0]...)
+			// pair = append(pair, '\t')
+			// pair = append(pair, currEntry.Pair[1]...)
+			// pair = append(pair, '\t')
+			// pair = append(pair, strconv.Itoa(currEntry.Weight)...)
+			if changed {
+				currEntry.ReRaw(currEntryData.ToBytes())
+				listManager.ReSort()
+				list := listManager.List()
 
-			// 重新设置 listManager 的 currIndex为当前修改的项
-			for i, item := range list {
-				if item.(*dict.MatchResult).Entry == currEntry {
-					listManager.SetIndex(i)
-					break
+				// 重新设置 listManager 的 currIndex为当前修改的项
+				for i, item := range list {
+					if item.(*dict.MatchResult).Entry == currEntry {
+						listManager.SetIndex(i)
+						break
+					}
 				}
 			}
 			return m, func() tea.Msg { return 0 } // trigger bubbletea update
@@ -277,9 +287,11 @@ func Start(opts *Options) {
 				cancelFunc = cancel
 				rs := []rune(raw)
 				if len(raw) > 0 {
-					pair := dict.ParseInput(raw)
-					if pair[1] != "" {
-						rs = []rune(pair[1])
+					// if the input has code(码) then change the rs(search term) to code
+					pairs, cols := dict.ParseInput(raw)
+					codeIndex := slices.Index(cols, dict.COLUMN_CODE)
+					if codeIndex != -1 {
+						rs = []rune(pairs[codeIndex])
 					}
 				}
 				go dc.Search(rs, resultChan, ctx)

@@ -14,11 +14,12 @@ func Test_Dictionary_Search(t *testing.T) {
 		key []rune
 		fes []*FileEntries
 	}
+	// cols := []Column{COLUMN_TEXT, COLUMN_CODE}
 	fes1 := &FileEntries{
 		Entries: []*Entry{
-			NewEntry([]byte("helle world"), "", 1, 0),
-			NewEntry([]byte("hi, did eve alive?"), "", 2, 0),
-			NewEntry([]byte("你好"), "", 3, 0),
+			NewEntry([]byte("helle world"), 0, 1, 0),
+			NewEntry([]byte("hi, did eve alive?"), 0, 2, 0),
+			NewEntry([]byte("你好"), 0, 3, 0),
 		},
 	}
 	tests := []struct {
@@ -58,95 +59,154 @@ func Test_Dictionary_Search(t *testing.T) {
 }
 
 func Test_ParseInput(t *testing.T) {
-	type args struct {
-		raw string
-	}
 	tests := []struct {
-		name string
-		args args
-		want [3]string
+		name     string
+		args     string
+		wantPair []string
+		wantCols []Column
 	}{
-		{"case1", args{"你\t好"}, [3]string{"你 好", "", ""}},
-		{"case2", args{"你 好"}, [3]string{"你 好", "", ""}},
-		{"case3", args{"你  好"}, [3]string{"你 好", "", ""}},
-		{"case4", args{"你\t 好"}, [3]string{"你 好", "", ""}},
-		{"case5", args{"你   好\t 1"}, [3]string{"你 好", "", "1"}},
-		{"case6", args{"你好 nau 1"}, [3]string{"你好", "nau", "1"}},
-		{"case7", args{"nau 你好 1"}, [3]string{"你好", "nau", "1"}},
-		{"case8", args{"  nau 你好 1 "}, [3]string{"你好", "nau", "1"}},
-		{"case9", args{"nau hi你好ya 1 "}, [3]string{"hi你好ya", "nau", "1"}},
-		{"case10", args{"nau 1 hi 你好 ya 1i "}, [3]string{"你好", "ya 1i", "1"}},
-		{"case10", args{"你好 ni hao 1"}, [3]string{"你好", "ni hao", "1"}},
+		{
+			name:     "case1",
+			args:     "你\t好",
+			wantPair: []string{"你 好"},
+			wantCols: []Column{COLUMN_TEXT},
+		},
+		{
+			name:     "case2",
+			args:     "你 好",
+			wantPair: []string{"你 好"},
+			wantCols: []Column{COLUMN_TEXT},
+		},
+		{
+			name:     "case3",
+			args:     "你  好",
+			wantPair: []string{"你 好"},
+			wantCols: []Column{COLUMN_TEXT}},
+		{
+			name:     "case4",
+			args:     "你\t 好",
+			wantPair: []string{"你 好"},
+			wantCols: []Column{COLUMN_TEXT}},
+		{
+			name:     "case5",
+			args:     "你   好\t 1",
+			wantPair: []string{"你 好", "1"},
+			wantCols: []Column{COLUMN_TEXT, COLUMN_WEIGHT},
+		},
+		{
+			name:     "case6",
+			args:     "你好 nau 1",
+			wantPair: []string{"你好", "nau", "1"},
+			wantCols: []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT},
+		},
+		{
+			name:     "case7",
+			args:     "nau 你好 1",
+			wantPair: []string{"nau", "你好", "1"},
+			wantCols: []Column{COLUMN_CODE, COLUMN_TEXT, COLUMN_WEIGHT},
+		},
+		{
+			name:     "case8",
+			args:     "  nau 你好 1 ",
+			wantPair: []string{"nau", "你好", "1"},
+			wantCols: []Column{COLUMN_CODE, COLUMN_TEXT, COLUMN_WEIGHT},
+		},
+		{
+			name:     "case9",
+			args:     "nau hi你好ya 1 ",
+			wantPair: []string{"nau", "hi你好ya", "1"},
+			wantCols: []Column{COLUMN_CODE, COLUMN_TEXT, COLUMN_WEIGHT},
+		},
+		{
+			name:     "case10",
+			args:     "nau 1 hi 你好 ya 1i ",
+			wantPair: []string{"nau", "1", "hi ya 1i", "你好"},
+			wantCols: []Column{COLUMN_CODE, COLUMN_WEIGHT, COLUMN_STEM, COLUMN_TEXT},
+		},
+		{
+			name:     "case10",
+			args:     "你好 ni hao 1",
+			wantPair: []string{"你好", "ni", "hao", "1"},
+			wantCols: []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_STEM, COLUMN_WEIGHT},
+		},
 	}
 	fields := strings.Fields("你\t好")
 	fmt.Println(fields, len(fields))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ParseInput(tt.args.raw); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ParsePair() = %v, want %v", got, tt.want)
+			pair, cols := ParseInput(tt.args)
+			if !reflect.DeepEqual(pair, tt.wantPair) {
+				t.Errorf("ParsePair() = %v, want %v", pair, tt.wantPair)
+			}
+			if !reflect.DeepEqual(cols, tt.wantCols) {
+				t.Errorf("ParsePair() = %v, want %v", cols, tt.wantCols)
 			}
 		})
 	}
 }
 
-func Test_ParsePair(t *testing.T) {
-	type args struct {
-		raw string
-	}
+func Test_ParseData(t *testing.T) {
 	tests := []struct {
 		name string
-		args args
-		want []string
+		raw  string
+		// cols []Column
+		want Data
 	}{
 		{
 			name: "case1",
-			args: args{"你好	nau"},
-			want: []string{"你好", "nau"},
+			raw:  "你好	nau",
+			// ,
+			want: Data{Text: "你好", Code: "nau", cols: []Column{COLUMN_TEXT, COLUMN_CODE}},
 		},
 		{
 			name: "case2",
-			args: args{"你好\t\n"},
-			want: []string{"你好"},
+			raw:  "你好\t\n",
+			// cols: []Column{COLUMN_TEXT, COLUMN_CODE},
+			want: Data{Text: "你好", Code: "", cols: []Column{COLUMN_TEXT}},
 		},
 		{
 			name: "case3",
-			args: args{"你好 nau"},
-			want: []string{"你好 nau"},
+			raw:  "你好 nau",
+			// cols: []Column{COLUMN_TEXT, COLUMN_CODE},
+			want: Data{Text: "你好", Code: "nau", cols: []Column{COLUMN_TEXT, COLUMN_CODE}},
 		},
 		{
 			name: "case4",
-			args: args{" "},
-			want: []string{},
+			raw:  "1               \t",
+			// cols: []Column{COLUMN_TEXT, COLUMN_CODE},
+			want: Data{Weight: 1, cols: []Column{COLUMN_WEIGHT}},
 		},
 		{
 			name: "case5",
-			args: args{"你 好 nau 1"},
-			want: []string{"你 好 nau 1"},
+			raw:  "你 好 nau 1",
+			// cols: []Column{COLUMN_TEXT, COLUMN_CODE},
+			want: Data{Text: "你 好", Code: "nau", Weight: 1, cols: []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT}},
 		},
 		{
 			name: "case6",
-			args: args{"你 好\tnau\t1"},
-			want: []string{"你 好", "nau", "1"},
+			raw:  "你 好\tnau\t1",
+			// cols: []Column{COLUMN_TEXT, COLUMN_CODE},
+			want: Data{Text: "你 好", Code: "nau", Weight: 1, cols: []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT}},
 		},
 		{
 			name: "case7",
-			args: args{"你 好\t \tnau              \t1"},
-			want: []string{"你 好", "nau", "1"},
+			raw:  "你 好\t \tnau              \t1",
+			// cols: []Column{COLUMN_TEXT, COLUMN_CODE},
+			want: Data{Text: "你 好", Code: "nau", Weight: 1, cols: []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT}},
 		},
 		{
 			name: "case8",
-			args: args{"你好\t \tni hao\t1"},
-			want: []string{"你好", "ni hao", "1"},
+			raw:  "你好\t \tni hao\t1",
+			// cols: []Column{COLUMN_TEXT, COLUMN_CODE},
+			want: Data{Text: "你好", Code: "ni", Stem: "hao", Weight: 1, cols: []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_STEM, COLUMN_WEIGHT}},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			want := make([][]byte, len(tt.want))
-			for i, s := range tt.want {
-				want[i] = []byte(s)
-			}
-			if got := ParsePair([]byte(tt.args.raw)); !reflect.DeepEqual(got, want) {
-				t.Errorf("ParsePair() = %v, want %v", got, want)
+			pair, cols := ParseInput(tt.raw)
+			data, _ := ParseData(pair, cols)
+			if !reflect.DeepEqual(*data, tt.want) {
+				t.Errorf("ParsePair() = %+v, want %+v", data, tt.want)
 			}
 		})
 	}

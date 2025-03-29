@@ -1,9 +1,10 @@
 package dict
 
 import (
-	"bytes"
 	"context"
+	"errors"
 	"log"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -65,7 +66,7 @@ func (d *Dictionary) Search(key []rune, resultChan chan<- []*MatchResult, ctx co
 
 func (d *Dictionary) Add(entry *Entry) {
 	for _, fe := range d.fileEntries {
-		if fe.FilePath == entry.refFile {
+		if fe.ID == entry.FID {
 			fe.Entries = append(fe.Entries, entry)
 		}
 	}
@@ -98,10 +99,6 @@ func (d *Dictionary) ExportDict(path string) {
 	exportDict(path, d.fileEntries)
 }
 
-func (d *Dictionary) Files() []*FileEntries {
-	return d.fileEntries
-}
-
 type ModifyType int
 
 const (
@@ -112,28 +109,38 @@ const (
 )
 
 type Entry struct {
-	refFile string
-	Pair    [][]byte
-	text    util.Chars
+	FID     uint8
 	seek    int64
 	rawSize int64
 	modType ModifyType
 	saved   bool
-	Weight  int
+	raw     []byte
+}
+
+func (e *Entry) Data() *Data {
+	pair, cols := ParseInput(string(e.raw))
+	data, _ := ParseData(pair, cols)
+	return data
 }
 
 func (e *Entry) ReRaw(raw []byte) {
-	e.text = util.ToChars(raw)
-	e.Pair = ParsePair(raw)
+	e.raw = raw
+	e.flagModded()
+	// don't change rawSize
+}
+
+// for fzf match
+func (e *Entry) Chars() *util.Chars {
+	// TODO: store chars
+	chars := util.ToChars(e.raw)
+	return &chars
+}
+
+func (e *Entry) flagModded() {
 	if e.modType != ADD {
 		e.modType = MODIFY
 	}
 	e.saved = false
-	e.Weight = 1
-	if len(e.Pair) >= 3 {
-		e.Weight, _ = strconv.Atoi(string(e.Pair[2]))
-	}
-	// don't change rawSize
 }
 
 func (e *Entry) Delete() {
@@ -145,71 +152,63 @@ func (e *Entry) IsDelete() bool {
 	return e.modType == DELETE
 }
 
-func (e *Entry) String() string {
+func (e *Entry) Raw() []byte {
 	// return e.text.ToString() + "\t" + e.refFile
-	return e.text.ToString()
+	return e.raw
 }
 
 func (e *Entry) Saved() {
 	e.saved = true
 	if e.modType == MODIFY {
-		e.rawSize = int64(len(e.WriteLine())) + 1 // + 1 for '\n'
+		e.rawSize = int64(len(e.raw)) + 1 // + 1 for '\n'
 	}
-}
-
-func (e *Entry) WriteLine() []byte {
-	bs := make([]byte, 0)
-	for i := 0; i < len(e.Pair); i++ {
-		if len(bytes.TrimSpace(e.Pair[i])) == 0 {
-			continue
-		}
-		bs = append(bs, e.Pair[i]...)
-		if i < len(e.Pair)-1 {
-			bs = append(bs, '\t')
-		}
-	}
-	return bs
 }
 
 // Parse input string to a pair of strings
-// 0: 表(汉字) 1: 码(字母) 2: 权重
 // 支持乱序输入，如 "你好 nau 1" 或 "nau 1 你好"
-func ParseInput(raw string) (pair [3]string) {
-	pair = [3]string{}
+func ParseInput(raw string) ([]string, []Column) {
+	pair := make([]string, 0)
+	cols := make([]Column, 0)
 	// split by '\t' or ' '
 	splits := strings.Fields(raw)
-	lastType := 1 // 1: number 2:ascii 3:汉字
+	textIndex := -1
 	for i := 0; i < len(splits); i++ {
-		item := strings.TrimSpace(splits[i])
-		if len(item) == 0 {
+		split := strings.TrimSpace(splits[i])
+		if len(split) == 0 {
 			continue
 		}
-		if isNumber(item) {
-			if lastType == 1 {
-				pair[2] = pair[2] + " " + item
+		if isNumber(split) {
+			cols = append(cols, COLUMN_WEIGHT)
+			pair = append(pair, split)
+			continue
+		}
+		if isAscii(split) {
+			stemIndex := slices.Index(cols, COLUMN_STEM)
+			codeIndex := slices.Index(cols, COLUMN_CODE)
+			if codeIndex == -1 {
+				cols = append(cols, COLUMN_CODE)
+				pair = append(pair, split)
 			} else {
-				pair[2] = item
+				if stemIndex == -1 {
+					cols = append(cols, COLUMN_STEM)
+					pair = append(pair, split)
+				} else {
+					pair[stemIndex] = pair[stemIndex] + " " + split
+				}
 			}
-			lastType = 1
 			continue
 		}
-		if isAscii(item) {
-			if lastType == 2 {
-				pair[1] = pair[1] + " " + item
-			} else {
-				pair[1] = item
-			}
-			lastType = 2
-			continue
+		// 汉字
+		if textIndex == -1 {
+			textIndex = i
+			pair = append(pair, split)
+			cols = append(cols, COLUMN_TEXT)
+		} else {
+			// 表(汉字)的输入可能包含空格，类似 "富强 强国"，因此在splited后重新拼接起来。
+			pair[textIndex] = pair[textIndex] + " " + split
 		}
-		// 表(汉字)的输入可能包含空格，类似 "富强 强国"，因此在splited后重新拼接起来。
-		pair[0] = pair[0] + " " + item
-		lastType = 3
 	}
-	for i := 0; i < len(pair); i++ {
-		pair[i] = strings.TrimSpace(pair[i])
-	}
-	return
+	return pair, cols
 }
 
 func isNumber(str string) bool {
@@ -230,59 +229,92 @@ func isAscii(str string) bool {
 	return true
 }
 
-// Parse bytes as a couple of strings([]byte) separated by '\t'
-// e.g. "你好	nau" > ["你好", "nau"]
-// not like ParseInput, this function simply split by '\t'
-func ParsePair(raw []byte) [][]byte {
-	pair := make([][]byte, 0)
-	for i, j := 0, 0; i < len(raw); i++ {
-		if raw[i] == '\t' {
-			item := bytes.TrimSpace(raw[j:i])
-			if len(item) > 0 {
-				pair = append(pair, item)
-			}
-			j = i + 1
-		}
-		if i == len(raw)-1 && j <= i {
-			item := bytes.TrimSpace(raw[j:])
-			if len(item) > 0 {
-				pair = append(pair, item)
-			}
+func ParseData(pair []string, columns []Column) (*Data, error) {
+	if len(pair) != len(columns) {
+		return nil, errors.New("raw")
+	}
+	var data Data
+	data.cols = columns
+	for i := 0; i < len(pair); i++ {
+		term := pair[i]
+		col := columns[i]
+		switch col {
+		case COLUMN_TEXT:
+			data.Text = term
+		case COLUMN_CODE:
+			data.Code = term
+		case COLUMN_WEIGHT:
+			data.Weight, _ = strconv.Atoi(term)
+		case COLUMN_STEM:
+			data.Stem = term
+		default:
+			continue
 		}
 	}
-	return pair
+	return &data, nil
 }
 
-func NewEntry(raw []byte, refFile string, seek int64, size int64) *Entry {
-	pair := ParsePair(raw)
-	weight := 1
-	if len(pair) >= 3 {
-		weight, _ = strconv.Atoi(string(pair[2]))
-	}
+func NewEntry(raw []byte, fileID uint8, seek int64, size int64) *Entry {
 	return &Entry{
-		text:    util.ToChars(raw),
-		Pair:    pair,
-		refFile: refFile,
+		FID:     fileID,
 		modType: NC,
 		seek:    seek,
 		rawSize: size,
-		Weight:  weight,
 		saved:   true,
+		raw:     raw,
 	}
 }
 
-func NewEntryAdd(raw []byte, refFile string) *Entry {
-	pair := ParsePair(raw)
-	weight := 1
-	if len(pair) >= 3 {
-		weight, _ = strconv.Atoi(string(pair[2]))
-	}
+func NewEntryAdd(raw []byte, fileID uint8) *Entry {
 	return &Entry{
-		text:    util.ToChars(raw),
-		Pair:    pair,
-		refFile: refFile,
+		FID:     fileID,
 		modType: ADD,
 		saved:   false,
-		Weight:  weight,
+		raw:     raw,
 	}
 }
+
+type Data struct {
+	Text   string
+	Code   string
+	Stem   string
+	Weight int
+	cols   []Column
+}
+
+func (d *Data) ToBytes() []byte {
+	return d.ToBytesWithColumns(d.cols)
+}
+
+func (d *Data) ToBytesWithColumns(cols []Column) []byte {
+	bs := make([]byte, 0)
+	for _, col := range cols {
+		var b []byte
+		switch col {
+		case COLUMN_TEXT:
+			b = []byte(d.Text)
+		case COLUMN_WEIGHT:
+			b = []byte(strconv.Itoa(d.Weight))
+		case COLUMN_CODE:
+			b = []byte(d.Code)
+		case COLUMN_STEM:
+			b = []byte(d.Stem)
+		}
+		if len(bs) > 0 {
+			bs = append(bs, '\t')
+		}
+		bs = append(bs, b...)
+	}
+	return bs
+}
+
+type Column uint8
+
+const (
+	COLUMN_TEXT   Column = 0
+	COLUMN_CODE   Column = 1
+	COLUMN_WEIGHT Column = 2
+	COLUMN_STEM   Column = 3
+)
+
+var DEFAULT_COLUMNS = []Column{COLUMN_TEXT, COLUMN_WEIGHT, COLUMN_CODE, COLUMN_STEM}

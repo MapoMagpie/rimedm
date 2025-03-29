@@ -13,12 +13,12 @@ type MatchResult struct {
 }
 
 func (m *MatchResult) String() string {
-	return m.Entry.String()
+	return string(m.Entry.raw)
 }
 
 func (m *MatchResult) Order() int {
 	score := m.result.Score
-	score = score * (1000 - m.Entry.text.Length())
+	score = score * (1000 - m.Entry.Chars().Length())
 	// * (10 * m.Entry.Weight)
 	return score
 }
@@ -79,7 +79,7 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*Ma
 			return
 		}
 		if entry.modType != DELETE {
-			result, _ := algo.FuzzyMatchV2(false, true, true, &entry.text, key, false, slab)
+			result, _ := algo.FuzzyMatchV2(false, true, true, entry.Chars(), key, false, slab)
 			if result.Score > 0 {
 				matched = append(matched, &MatchResult{entry, result})
 			}

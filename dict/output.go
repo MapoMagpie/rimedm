@@ -20,7 +20,7 @@ func exportDict(path string, fes []*FileEntries) {
 			continue
 		}
 		for _, entry := range fe.Entries {
-			bs := entry.WriteLine()
+			bs := entry.Raw()
 			bs = append(bs, '\n')
 			_, err := file.Write(bs)
 			if err != nil {
@@ -76,7 +76,7 @@ func outputFile(rawBs *[]byte, path string, entries []*Entry) (changed bool) {
 			seekFixed = seekFixed - entry.rawSize
 			modType = "DELETE"
 		case MODIFY:
-			nbs := entry.WriteLine()
+			nbs := entry.Raw()
 			nbs = append(nbs, '\n')
 			bs = append(bs[:entry.seek], append(nbs, bs[entry.seek+entry.rawSize:]...)...)
 			seekFixed = seekFixed - entry.rawSize + int64(len(nbs))
@@ -85,7 +85,7 @@ func outputFile(rawBs *[]byte, path string, entries []*Entry) (changed bool) {
 			willAddEntries = append(willAddEntries, entry)
 			modType = "ADD"
 		}
-		log.Printf("modify dict type:%s | %s", modType, entry.String())
+		log.Printf("modify dict type:%s | %s", modType, entry.Raw())
 		changed = true
 		entry.Saved()
 	}
@@ -97,7 +97,7 @@ func outputFile(rawBs *[]byte, path string, entries []*Entry) (changed bool) {
 			bs = append(bs, '\n')
 		}
 		for _, entry := range willAddEntries {
-			bs = append(bs, entry.WriteLine()...)
+			bs = append(bs, entry.Raw()...)
 			bs = append(bs, '\n')
 		}
 	}

@@ -8,7 +8,7 @@ import (
 )
 
 func Test_LoadItems(t *testing.T) {
-	filename := mockFile()
+	filenames := mockFile()
 	defer os.RemoveAll("./tmp")
 	type args struct {
 		path string
@@ -18,7 +18,8 @@ func Test_LoadItems(t *testing.T) {
 		args args
 		want int
 	}{
-		{"1", args{filename}, 19},
+		{"xkdj", args{filenames[0]}, 20},
+		{"tigress", args{filenames[1]}, 14},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(_ *testing.T) {
@@ -26,10 +27,15 @@ func Test_LoadItems(t *testing.T) {
 			fes := LoadItems(tt.args.path)
 			duration1 := time.Since(start)
 			fmt.Println("======================================================")
+			fmt.Println("fes >>", len(fes))
 			entries := make([]*Entry, 0)
 			if len(fes) > 0 {
 				for _, fe := range fes {
+					fmt.Println("fe >>", fe.FilePath)
 					entries = append(entries, fe.Entries...)
+					for _, e := range fe.Entries {
+						fmt.Println("entry >>", string(e.raw))
+					}
 				}
 			}
 			fmt.Println("count >>", len(entries))
@@ -42,7 +48,8 @@ func Test_LoadItems(t *testing.T) {
 	}
 }
 
-func mockFile() string {
+func mockFile() []string {
+	filenames := make([]string, 0)
 	// create ./tmp directory
 	err := os.MkdirAll("./tmp", os.ModePerm)
 	if err != nil {
@@ -58,13 +65,15 @@ sort: original
 use_preset_vocabulary: false
 import_tables:
 # 扩展：单字
-  - rime.danzi
+  - xkjd6.danzi
 # 扩展：词组
-  - rime.cizu
+  - xkjd6.cizu
 # 扩展：符号
-  - rime.fuhao
+  - xkjd6.fuhao
+...
+所以	m
 `
-	filename := createFile("./tmp/rime.dict.yaml", content)
+	filenames = append(filenames, createFile("./tmp/xkjd6.dict.yaml", content))
 	content = `
 ---
 name: xkjd6.danzi
@@ -74,8 +83,8 @@ sort: original
 不	b
 宾	bb
 滨	bba
-  `
-	createFile("./tmp/rime.danzi.dict.yaml", content)
+`
+	createFile("./tmp/xkjd6.danzi.dict.yaml", content)
 	content = `
 ---
 name: xkjd6.cizu
@@ -83,13 +92,13 @@ version: "Q1"
 sort: original
 import_tables:
 # 扩展：单字
-  - rime.cizu2
+  - xkjd6.cizu2
 ...
 并不比	bbb
 彬彬	bbbb
 斌斌	bbbbo
-  `
-	createFile("./tmp/rime.cizu.dict.yaml", content)
+`
+	createFile("./tmp/xkjd6.cizu.dict.yaml", content)
 	content = `
 ①	oyk
 ②	oxj
@@ -101,8 +110,8 @@ import_tables:
 ⑧	obs
 ⑨	ojq
 ⑩	oek
-  `
-	createFile("./tmp/rime.fuhao.dict.yaml", content)
+`
+	createFile("./tmp/xkjd6.fuhao.dict.yaml", content)
 	content = `
 ---
 name: xkjd6.whatever
@@ -113,8 +122,92 @@ sort: original
 早做	zzzlo
 早早	zzzz
 `
-	createFile("./tmp/rime.cizu2.dict.yaml", content)
-	return filename
+	createFile("./tmp/xkjd6.cizu2.dict.yaml", content)
+	content = `
+name: tigress
+version: "2025.03.07"
+sort: by_weight
+columns:
+  - text
+  - weight
+  - code
+  - stem
+encoder:
+  rules:
+    - length_equal: 2
+      formula: "AaAbBaBb"
+    - length_equal: 3
+      formula: "AaBaCaCb"
+    - length_in_range: [4, 10]
+      formula: "AaBaCaZa"
+import_tables:
+  - tigress_ci
+  - tigress_simp_ci
+#  - tigress_user
+...
+
+的	10359470	u	un
+的	256	uni
+的	256	unid
+一	4346343	f	fi
+一	256	fi
+`
+	filenames = append(filenames, createFile("./tmp/tigress.dict.yaml", content))
+	content = `
+name: tigress_ci
+version: "2025.03.07"
+sort: by_weight
+use_preset_vocabulary: false
+columns:
+  - text
+  - weight
+  - code
+  - stem
+encoder:
+  rules:
+    - length_equal: 2
+      formula: "AaAbBaBb"
+    - length_equal: 3
+      formula: "AaBaCaCb"
+    - length_in_range: [4, 99]
+      formula: "AaBaCaZa"
+
+...
+我们	116006	tuja
+自己	109686	oivj
+一个	105148	fijg
+没有	90888	krnv
+什么	80552	jntk
+`
+	createFile("./tmp/tigress_ci.dict.yaml", content)
+	content = `
+name: tigress_simp_ci
+version: "2025.03.07"
+sort: by_weight
+use_preset_vocabulary: false
+columns:
+  - text
+  - weight
+  - code
+  - stem
+encoder:
+  rules:
+    - length_equal: 2
+      formula: "AaAbBaBb"
+    - length_equal: 3
+      formula: "AaBaCaCb"
+    - length_in_range: [4, 99]
+      formula: "AaBaCaZa"
+
+...
+那个	5000	a
+如果	5000	b
+不是	5000	c
+哪个	5000	d
+
+`
+	createFile("./tmp/tigress_simp_ci.dict.yaml", content)
+	return filenames
 }
 
 func createFile(name string, content string) string {
@@ -124,6 +217,6 @@ func createFile(name string, content string) string {
 		panic(err)
 	}
 	defer file.Close()
-	file.WriteString(content)
+	_, _ = file.WriteString(content)
 	return file.Name()
 }

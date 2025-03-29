@@ -1,37 +1,10 @@
 package dict
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"testing"
 )
-
-func Test_Entry_WriteLine(t *testing.T) {
-	tests := []struct {
-		name  string
-		want  []byte
-		entry Entry
-	}{
-		{
-			name:  "1",
-			entry: *NewEntryAdd([]byte("测试\tceek"), ""),
-			want:  []byte("测试\tceek"),
-		},
-		{
-			name:  "2",
-			entry: *NewEntryAdd([]byte("测试\tc\t1"), ""),
-			want:  []byte("测试\tc\t1"),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.entry.WriteLine(); !bytes.Equal(got, tt.want) {
-				t.Errorf("writeLine() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
 
 func Test_outputFile(t *testing.T) {
 	_ = os.MkdirAll("./tmp", os.ModePerm)
@@ -39,7 +12,23 @@ func Test_outputFile(t *testing.T) {
 	content1 := `
 ---
 name: xkjd6.whatever
+version: "Q1"
+sort: original
 ...
+早早	zzzzmod
+早早	zzzz
+测试	ceek
+  `
+	content2 := `
+name: xkjd6.whatever
+version: "Q1"
+sort: original
+...
+早早	zzzzmod
+早早	zzzz
+测试	ceek
+  `
+	content3 := `
 早早	zzzzmod
 早早	zzzz
 测试	ceek
@@ -47,6 +36,8 @@ name: xkjd6.whatever
 	content1_want1 := `
 ---
 name: xkjd6.whatever
+version: "Q1"
+sort: original
 ...
 早早	zzzz
 测试	ceek
@@ -55,15 +46,29 @@ name: xkjd6.whatever
 	content1_want2 := `
 ---
 name: xkjd6.whatever
+version: "Q1"
+sort: original
 ...
 早早	zzzz
   `
 	content1_want3 := `
 ---
 name: xkjd6.whatever
+version: "Q1"
+sort: original
 ...
 早早	zaozao
 测试	ceshi
+  `
+	content2_want1 := `
+name: xkjd6.whatever
+version: "Q1"
+sort: original
+...
+早早	zzzz
+  `
+	content3_want1 := `
+早早	zzzz
   `
 	tests := []struct {
 		fe            *FileEntries
@@ -148,6 +153,40 @@ name: xkjd6.whatever
 			want:          content1_want2,
 			shouldChanged: false,
 			filename:      "./tmp/test_outputfile5.yaml",
+		},
+		{
+			name: "content2",
+			fe: func() *FileEntries {
+				filename := createFile("./tmp/test_outputfile6.yaml", content2)
+				fe := LoadItems(filename)[0]
+				fe.Entries[0].Delete()
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				fmt.Println("---------------")
+				fe.Entries[2].Delete()
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				fmt.Println("---------------")
+				return fe
+			}(),
+			want:          content2_want1,
+			shouldChanged: false,
+			filename:      "./tmp/test_outputfile6.yaml",
+		},
+		{
+			name: "content3",
+			fe: func() *FileEntries {
+				filename := createFile("./tmp/test_outputfile7.yaml", content3)
+				fe := LoadItems(filename)[0]
+				fe.Entries[0].Delete()
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				fmt.Println("---------------")
+				fe.Entries[2].Delete()
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				fmt.Println("---------------")
+				return fe
+			}(),
+			want:          content3_want1,
+			shouldChanged: false,
+			filename:      "./tmp/test_outputfile7.yaml",
 		},
 	}
 

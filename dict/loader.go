@@ -18,7 +18,8 @@ type FileEntries struct {
 	FilePath string
 	RawBs    []byte
 	Entries  []*Entry
-	order    int
+	Columns  []Column
+	ID       uint8
 }
 
 func (fe *FileEntries) String() string {
@@ -26,7 +27,7 @@ func (fe *FileEntries) String() string {
 }
 
 func (fe *FileEntries) Order() int {
-	return fe.order
+	return int(fe.ID)
 }
 
 func LoadItems(paths ...string) (fes []*FileEntries) {
@@ -35,7 +36,7 @@ func LoadItems(paths ...string) (fes []*FileEntries) {
 	var wg sync.WaitGroup
 	for _, path := range paths {
 		wg.Add(1)
-		go loadFromFile(path, 0, ch, &wg)
+		go loadFromFile(path, ch, &wg)
 	}
 	go func() {
 		wg.Wait()
@@ -58,13 +59,13 @@ func LoadItems(paths ...string) (fes []*FileEntries) {
 }
 
 var (
-	YamlBegin = []byte{'-', '-', '-'}
-	YamlEnd   = []byte{'.', '.', '.'}
+	YAML_BEGIN = []byte{'-', '-', '-'}
+	YAML_END   = []byte{'.', '.', '.'}
 )
 
-func loadFromFile(path string, order int, ch chan<- *FileEntries, wg *sync.WaitGroup) {
+func loadFromFile(path string, ch chan<- *FileEntries, wg *sync.WaitGroup) {
 	defer wg.Done()
-	fe := &FileEntries{FilePath: path, Entries: make([]*Entry, 0), order: order}
+	fe := &FileEntries{FilePath: path, Entries: make([]*Entry, 0), ID: idgen.NextID()}
 	file, err := os.OpenFile(path, os.O_RDONLY, 0666)
 	if fe.Err = err; err != nil {
 		ch <- fe
@@ -86,68 +87,122 @@ func loadFromFile(path string, order int, ch chan<- *FileEntries, wg *sync.WaitG
 		return
 	}
 
-	duringYaml := 0 // 0: not in yaml, 1: in yaml
-	yamlContent := make([]byte, 0)
 	var seek int64 = 0
-	for {
-		bs, eof := bf.ReadBytes('\n')
-		size := len(bs)
-		seek += int64(size)
-		if size > 0 {
-			if bs[0] == '#' {
-				continue
-			}
-			if bytes.Equal(bytes.TrimSpace(bs), YamlBegin) {
-				duringYaml = 1
-				continue
-			} else if bytes.Equal(bytes.TrimSpace(bs), YamlEnd) {
-				loadExtendDict(path, order*10, yamlContent, ch, wg)
-				duringYaml = 0
-				continue
-			}
-			if duringYaml == 1 {
-				yamlContent = append(yamlContent, bs...)
-				continue
-			}
-			if duringYaml == 0 {
+	// 在开始读取 码 之前，尝试先读取yaml内容，
+	// 但是此文件也可能不包含yaml内容，
+	// 如果不包含yaml，那么head(buffer)将与bf(buffer)一起用于读取 码
+	head, size, exist := tryReadHead(bf)
+	if exist {
+		raw, err := io.ReadAll(head)
+		if err != nil {
+			log.Fatal("cant readAll bytes from head buffer")
+		}
+		seek = size
+		config, _ := parseYAML(raw)
+		fe.Columns = parseColumnsOrDefault(&config)
+		loadExtendDict(path, &config, ch, wg)
+	}
+
+	// 函数：读取 码
+	readEntries := func(buf *bytes.Buffer) {
+		for {
+			bs, eof := buf.ReadBytes('\n')
+			size := len(bs)
+			seek += int64(size)
+			if size > 0 {
+				if bs[0] == '#' {
+					continue
+				}
 				bs = bytes.TrimSpace(bs)
 				if len(bs) == 0 {
 					continue
 				}
-				fe.Entries = append(fe.Entries, NewEntry(bs, path, seek-int64(size), int64(size)))
+				fe.Entries = append(fe.Entries, NewEntry(bs, fe.ID, seek-int64(size), int64(size)))
+			}
+			if eof != nil {
+				break
 			}
 		}
-		if eof != nil {
-			break
-		}
 	}
-	if duringYaml == 1 && len(yamlContent) > 0 {
-		loadExtendDict(path, order*10, yamlContent, ch, wg)
+
+	if !exist {
+		readEntries(head)
 	}
+	readEntries(bf)
+
 	ch <- fe
 }
 
-func loadExtendDict(path string, order int, yamlContent []byte, ch chan<- *FileEntries, wg *sync.WaitGroup) {
-	paths, err := parseExtendPaths(path, yamlContent)
-	if err != nil {
-		log.Fatalf("parse [%s] yaml error: %s", path, err)
+func tryReadHead(buf *bytes.Buffer) (*bytes.Buffer, int64, bool) {
+	var size int64 = 0
+	lines := 0
+	headBuf := bytes.NewBuffer(make([]byte, 0))
+	for {
+		bs, eof := buf.ReadBytes('\n')
+		headBuf.Write(bs) // keep original content
+		size += int64(len(bs))
+		lines += 1
+		if size > 0 {
+			if bytes.Equal(bytes.TrimSpace(bs), YAML_BEGIN) {
+				continue
+			}
+			if bytes.Equal(bytes.TrimSpace(bs), YAML_END) {
+				return headBuf, size, true
+			}
+		}
+		if eof != nil || lines > 1000 { // 我不信有人的rime dict文件中，yaml部分能超过1000行。
+			break
+		}
 	}
+	return headBuf, size, false
+}
+
+func parseColumnsOrDefault(config *YAML) []Column {
+	cols := parseColumns(config)
+	if len(cols) == 0 {
+		// TODO: get example from content to parse cols
+		return []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT}
+	}
+	result := make([]Column, 0)
+	for _, col := range cols {
+		switch col {
+		case "text":
+			result = append(result, COLUMN_TEXT)
+		case "weight":
+			result = append(result, COLUMN_WEIGHT)
+		case "code":
+			result = append(result, COLUMN_CODE)
+		case "stem":
+			result = append(result, COLUMN_STEM)
+		}
+	}
+	return result
+}
+
+func loadExtendDict(path string, config *YAML, ch chan<- *FileEntries, wg *sync.WaitGroup) {
+	paths := parseExtendPaths(path, config)
 	wg.Add(len(paths))
-	for i, extendPath := range paths {
-		go func(newPath string, order int) {
-			loadFromFile(newPath, order, ch, wg)
-		}(extendPath, order+i)
+	for _, extendPath := range paths {
+		go func(newPath string) {
+			loadFromFile(newPath, ch, wg)
+		}(extendPath)
 	}
 }
 
-func parseExtendPaths(path string, yamlContent []byte) ([]string, error) {
+type YAML map[string]any
+
+func parseYAML(raw []byte) (YAML, error) {
+	config := make(YAML)
+	err := yaml.Unmarshal(raw, &config)
+	// if err != nil {
+	// 	log.Fatalf("parse [%s] yaml error: %s", path, err)
+	// }
+	return config, err
+}
+
+func parseExtendPaths(path string, config *YAML) []string {
 	extends := make([]string, 0)
-	yamlConfig := make(map[string]interface{})
-	err := yaml.Unmarshal(yamlContent, &yamlConfig)
-	if err != nil {
-		return extends, err
-	}
-	importTables := yamlConfig["import_tables"]
+	importTables := (*config)["import_tables"]
 	if importTables != nil {
 		pathFixed := filepath.Dir(path) + string(os.PathSeparator)
 		typeOf := reflect.TypeOf(importTables)
@@ -157,5 +212,18 @@ func parseExtendPaths(path string, yamlContent []byte) ([]string, error) {
 			}
 		}
 	}
-	return extends, nil
+	return extends
+}
+func parseColumns(config *YAML) []string {
+	result := make([]string, 0)
+	columns := (*config)["columns"]
+	if columns != nil {
+		typeOf := reflect.TypeOf(columns)
+		if typeOf.Kind() == reflect.Slice {
+			for _, col := range columns.([]any) {
+				result = append(result, fmt.Sprint(col))
+			}
+		}
+	}
+	return result
 }
