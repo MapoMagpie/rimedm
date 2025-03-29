@@ -111,27 +111,27 @@ func initConfigTemplate() string {
 # 支持多个主词典，注意是主词典，请不要将主词典与其所属拓展词典一同写在dict_paths:下
 # 在Linux + Fcitx5 + Fcitx5-Rime下，词典的路径一般是: $HOME/.local/share/fcitx5/rime/方案名.dict.yaml
 # 在Windows + 小狼毫下，词典的路径一般是: %%Appdata%%/Rime/方案名.dict.yaml
-#dict_paths:
-#	- 主词典1文件路径
-#	- 主词典2文件路径
-# 禁止
-#	- 主词典1下的拓展词典文件路径
+# dict_paths:
+#   - 主词典1文件路径
+#   - 主词典2文件路径
+#   # 禁止
+#   - 主词典1下的拓展词典文件路径
 dict_paths:
-	- %s
+  - %s
 
 # user_path 是用户词典路径，可以为空，
-#	当指定了用户词典时，在添加新词时，用户词典会作为优先的添加选项。
-#	如果没有指定用户词典，你也可以在添加时的选项中选择用户词典或其他词典。
-#user_path: 
+# 当指定了用户词典时，在添加新词时，用户词典会作为优先的添加选项。
+# 如果没有指定用户词典，你也可以在添加时的选项中选择用户词典或其他词典。
+# user_path: 
 
 # 是否在每次添加、删除、修改时立即同步到词典文件，默认为 true
 sync_on_change: true 
 # 在同步词典文件时，通过这个命令来重启 rime, 不同的系统环境下需要不同的命令。
 # 在Linux + Fcitx5 下可通过此命令来重启 rime: 
-#	dbus-send --session --print-reply --dest=org.fcitx.Fcitx5 /controller org.fcitx.Fcitx.Controller1.SetConfig string:'fcitx://config/addon/rime' variant:string:''
+#   dbus-send --session --print-reply --dest=org.fcitx.Fcitx5 /controller org.fcitx.Fcitx.Controller1.SetConfig string:'fcitx://config/addon/rime' variant:string:''
 # 在Windows + 小狼毫 下可通过此命令来重启 rime(注意程序版本): 
-#	C:\PROGRA~2\Rime\weasel-0.14.3\WeaselDeployer.exe /deploy
-#	注:PROGRA~2 = Program Files (x86) PROGRA~1 = Program Files
+#   C:\PROGRA~2\Rime\weasel-0.14.3\WeaselDeployer.exe /deploy
+#   注:PROGRA~2 = Program Files (x86) PROGRA~1 = Program Files
 restart_rime_cmd: %s`, dictPath, restartRimeCmd)
 }
 
