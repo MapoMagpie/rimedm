@@ -1,0 +1,84 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+name: Release Build
+
+on:
+  push:
+    tags:
+      - '*'  # 匹配所有 tag
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 'stable'
+
+      - name: Get tag version
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create output directory
+        run: mkdir -p dist
+
+      - name: Build for Darwin (macOS) - arm64
+        run: |
+          GOOS=darwin GOARCH=arm64 go build -o rimedm
+          tar czf dist/rimedm_Darwin_arm64.tar.gz rimedm
+          rm rimedm
+
+      - name: Build for Darwin (macOS) - x86_64
+        run: |
+          GOOS=darwin GOARCH=amd64 go build -o rimedm
+          tar czf dist/rimedm_Darwin_x86_64.tar.gz rimedm
+          rm rimedm
+
+      - name: Build for Linux - arm64
+        run: |
+          GOOS=linux GOARCH=arm64 go build -o rimedm
+          tar czf dist/rimedm_Linux_arm64.tar.gz rimedm
+          rm rimedm
+
+      - name: Build for Linux - x86_64
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o rimedm
+          tar czf dist/rimedm_Linux_x86_64.tar.gz rimedm
+          rm rimedm
+
+      - name: Build for Windows - arm64
+        run: |
+          GOOS=windows GOARCH=arm64 go build -o rimedm.exe
+          zip -j dist/rimedm_Windows_arm64.zip rimedm.exe
+          rm rimedm.exe
+
+      - name: Build for Windows - x86_64
+        run: |
+          GOOS=windows GOARCH=amd64 go build -o rimedm.exe
+          zip -j dist/rimedm_Windows_x86_64.zip rimedm.exe
+          rm rimedm.exe
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum * > checksums.txt
+          cd ..
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.get_version.outputs.version }}
+          tag_name: ${{ steps.get_version.outputs.version }}
+          body: "Pre-built binaries for ${{ steps.get_version.outputs.version }}"
+          files: |
+            dist/rimedm_*
+            dist/checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
