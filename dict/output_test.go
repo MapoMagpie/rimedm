@@ -97,6 +97,18 @@ columns:
 测试	ceek	10
 伊藤萌子	jllh	10
 `
+	content4_want2 := `
+name: xkjd6.whatever
+version: "Q1"
+sort: original
+columns:
+  - text
+  - code
+  - weight
+...
+早早	zzzzmod	10
+测	ceek	10
+`
 	tests := []struct {
 		fe            *FileEntries
 		name          string
@@ -245,6 +257,24 @@ columns:
 			want:          content4_want1,
 			shouldChanged: false,
 			filename:      "./tmp/test_outputfile8.yaml",
+		},
+		{
+			name: "delete and save and delete again",
+			fe: func() *FileEntries {
+				filename := createFile("./tmp/test_outputfile9.yaml", content4)
+				fe := LoadItems(filename)[0]
+				de := fe.Entries[1]
+				d1 := fe.Entries[2]
+				d1.ReRaw([]byte("测	ceek	10"))
+				de.Delete()
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				de.Delete()
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				return fe
+			}(),
+			want:          content4_want2,
+			shouldChanged: false,
+			filename:      "./tmp/test_outputfile9.yaml",
 		},
 	}
 

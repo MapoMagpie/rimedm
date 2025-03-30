@@ -78,7 +78,7 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*Ma
 		if done {
 			return
 		}
-		if entry.modType != DELETE {
+		if !entry.IsDelete() {
 			result, _ := algo.FuzzyMatchV2(false, true, true, entry.Chars(), key, false, slab)
 			if result.Score > 0 {
 				matched = append(matched, &MatchResult{entry, result})

@@ -144,8 +144,11 @@ func (e *Entry) Chars() *util.Chars {
 }
 
 func (e *Entry) Delete() {
-	e.modType = DELETE
+	if e.deleted {
+		return
+	}
 	e.deleted = true
+	e.modType = DELETE
 }
 
 func (e *Entry) IsDelete() bool {
