@@ -226,12 +226,6 @@ func Start(opts *Options) {
 				currEntryData.Weight = int(math.Max(1, float64(currEntryData.Weight+1)))
 				changed = true
 			}
-			// pair := make([]byte, 0)
-			// pair = append(pair, currEntry.Pair[0]...)
-			// pair = append(pair, '\t')
-			// pair = append(pair, currEntry.Pair[1]...)
-			// pair = append(pair, '\t')
-			// pair = append(pair, strconv.Itoa(currEntry.Weight)...)
 			if changed {
 				currEntry.ReRaw(currEntryData.ToBytes())
 				listManager.ReSort()

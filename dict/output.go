@@ -66,7 +66,7 @@ func outputFile(rawBs *[]byte, path string, entries []*Entry) (changed bool) {
 	seekFixed := int64(0)
 	for _, entry := range entries {
 		entry.seek += seekFixed
-		if entry.saved || entry.modType == NC {
+		if entry.modType == NC {
 			continue
 		}
 		var modType string
@@ -74,31 +74,40 @@ func outputFile(rawBs *[]byte, path string, entries []*Entry) (changed bool) {
 		case DELETE:
 			bs = append(bs[:entry.seek], bs[entry.seek+entry.rawSize:]...)
 			seekFixed = seekFixed - entry.rawSize
-			modType = "DELETE"
+			entry.Saved()
+			modType = "DEL"
 		case MODIFY:
 			nbs := entry.Raw()
 			nbs = append(nbs, '\n')
 			bs = append(bs[:entry.seek], append(nbs, bs[entry.seek+entry.rawSize:]...)...)
 			seekFixed = seekFixed - entry.rawSize + int64(len(nbs))
-			modType = "MODIFY"
+			entry.Saved()
+			modType = "MOD"
 		case ADD:
 			willAddEntries = append(willAddEntries, entry)
 			modType = "ADD"
 		}
 		log.Printf("modify dict type:%s | %s", modType, entry.Raw())
 		changed = true
-		entry.Saved()
 	}
 	if !changed {
 		return
 	}
+	var seek int64 = int64(len(bs))
+	// append new entry to file
 	if len(willAddEntries) > 0 {
 		if bs[len(bs)-1] != '\n' {
 			bs = append(bs, '\n')
+			seek += 1
 		}
 		for _, entry := range willAddEntries {
-			bs = append(bs, entry.Raw()...)
+			raw := entry.Raw()
+			rawSize := int64(len(raw) + 1)
+			bs = append(bs, raw...)
 			bs = append(bs, '\n')
+			entry.reSeek(seek, rawSize)
+			entry.Saved()
+			seek += entry.rawSize
 		}
 	}
 	*rawBs = bs

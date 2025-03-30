@@ -113,8 +113,8 @@ type Entry struct {
 	seek    int64
 	rawSize int64
 	modType ModifyType
-	saved   bool
 	raw     []byte
+	deleted bool
 }
 
 func (e *Entry) Data() *Data {
@@ -125,8 +125,15 @@ func (e *Entry) Data() *Data {
 
 func (e *Entry) ReRaw(raw []byte) {
 	e.raw = raw
-	e.flagModded()
+	if e.modType != ADD {
+		e.modType = MODIFY
+	}
 	// don't change rawSize
+}
+
+func (e *Entry) reSeek(seek int64, rawSize int64) {
+	e.seek = seek
+	e.rawSize = rawSize
 }
 
 // for fzf match
@@ -136,20 +143,13 @@ func (e *Entry) Chars() *util.Chars {
 	return &chars
 }
 
-func (e *Entry) flagModded() {
-	if e.modType != ADD {
-		e.modType = MODIFY
-	}
-	e.saved = false
-}
-
 func (e *Entry) Delete() {
 	e.modType = DELETE
-	e.saved = false
+	e.deleted = true
 }
 
 func (e *Entry) IsDelete() bool {
-	return e.modType == DELETE
+	return e.deleted
 }
 
 func (e *Entry) Raw() []byte {
@@ -158,10 +158,8 @@ func (e *Entry) Raw() []byte {
 }
 
 func (e *Entry) Saved() {
-	e.saved = true
-	if e.modType == MODIFY {
-		e.rawSize = int64(len(e.raw)) + 1 // + 1 for '\n'
-	}
+	e.rawSize = int64(len(e.raw)) + 1 // + 1 for '\n'
+	e.modType = NC
 }
 
 // Parse input string to a pair of strings
@@ -260,7 +258,6 @@ func NewEntry(raw []byte, fileID uint8, seek int64, size int64) *Entry {
 		modType: NC,
 		seek:    seek,
 		rawSize: size,
-		saved:   true,
 		raw:     raw,
 	}
 }
@@ -269,7 +266,6 @@ func NewEntryAdd(raw []byte, fileID uint8) *Entry {
 	return &Entry{
 		FID:     fileID,
 		modType: ADD,
-		saved:   false,
 		raw:     raw,
 	}
 }

@@ -18,7 +18,7 @@ sort: original
 早早	zzzzmod
 早早	zzzz
 测试	ceek
-  `
+`
 	content2 := `
 name: xkjd6.whatever
 version: "Q1"
@@ -27,12 +27,12 @@ sort: original
 早早	zzzzmod
 早早	zzzz
 测试	ceek
-  `
+`
 	content3 := `
 早早	zzzzmod
 早早	zzzz
 测试	ceek
-  `
+`
 	content1_want1 := `
 ---
 name: xkjd6.whatever
@@ -41,7 +41,7 @@ sort: original
 ...
 早早	zzzz
 测试	ceek
-  `
+`
 
 	content1_want2 := `
 ---
@@ -50,7 +50,7 @@ version: "Q1"
 sort: original
 ...
 早早	zzzz
-  `
+`
 	content1_want3 := `
 ---
 name: xkjd6.whatever
@@ -59,17 +59,44 @@ sort: original
 ...
 早早	zaozao
 测试	ceshi
-  `
+`
 	content2_want1 := `
 name: xkjd6.whatever
 version: "Q1"
 sort: original
 ...
 早早	zzzz
-  `
+`
 	content3_want1 := `
 早早	zzzz
-  `
+`
+	content4 := `
+name: xkjd6.whatever
+version: "Q1"
+sort: original
+columns:
+  - text
+  - code
+  - weight
+...
+早早	zzzzmod	10
+早早	zzzz	10
+测试	ceek	10
+`
+	content4_want1 := `
+name: xkjd6.whatever
+version: "Q1"
+sort: original
+columns:
+  - text
+  - code
+  - weight
+...
+早早	zzzzmod	10
+早早	zzzz	10
+测试	ceek	10
+伊藤萌子	jllh	10
+`
 	tests := []struct {
 		fe            *FileEntries
 		name          string
@@ -188,6 +215,37 @@ sort: original
 			shouldChanged: false,
 			filename:      "./tmp/test_outputfile7.yaml",
 		},
+		{
+			name: "add and modify",
+			fe: func() *FileEntries {
+				filename := createFile("./tmp/test_outputfile8.yaml", content4)
+				fe := LoadItems(filename)[0]
+
+				// new entry then just delete
+				ne0 := NewEntryAdd([]byte("萌子	lohi	1"), 0)
+				fe.Entries = append(fe.Entries, ne0)
+				// outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				ne0.Delete()
+
+				ne1 := NewEntryAdd([]byte("萌子	lohi	1"), 0)
+				fe.Entries = append(fe.Entries, ne1)
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				ne1.Delete()
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+
+				ne2 := NewEntryAdd([]byte("伊藤	jblv	1"), 0)
+				fe.Entries = append(fe.Entries, ne2)
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				ne2.ReRaw([]byte("伊藤	jblv	10"))
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				ne2.ReRaw([]byte("伊藤萌子	jllh	10"))
+				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
+				return fe
+			}(),
+			want:          content4_want1,
+			shouldChanged: false,
+			filename:      "./tmp/test_outputfile8.yaml",
+		},
 	}
 
 	for _, tt := range tests {
@@ -197,11 +255,11 @@ sort: original
 			if err != nil {
 				panic(err)
 			}
-			if string(c) != tt.want {
-				t.Errorf("case:%v\n%v\nwant\n%v", tt.name, string(c), tt.want)
+			if string(c) != string(tt.fe.RawBs) {
+				t.Errorf("case:%v file content != file\nfile\n%v[fin]\nRawBs\n%v[fin]", tt.name, string(c), string(tt.fe.RawBs))
 			}
 			if string(tt.fe.RawBs) != tt.want {
-				t.Errorf("case:%v\nfe.RawBs\n%v\nwant\n%v", tt.name, string(tt.fe.RawBs), tt.want)
+				t.Errorf("case:%v RawBs != want\nfe.RawBs\n%v[fin]\nwant\n%v[fin]", tt.name, string(tt.fe.RawBs), tt.want)
 			}
 			if tt.shouldChanged != changed {
 				t.Errorf("case:%v, changed: %v, want: %v", tt.name, changed, tt.shouldChanged)
