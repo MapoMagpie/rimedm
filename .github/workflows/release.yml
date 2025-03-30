@@ -30,7 +30,7 @@ jobs:
 
       - name: Get tag version
         id: get_version
-        run: echo "version=${{ github.event.inputs.custom_tag }}" >> $GITHUB_OUTPUT
+        run: echo "version=${{ github.event.inputs.tag_version }}" >> $GITHUB_OUTPUT
 
       - name: Create output directory
         run: mkdir -p dist
