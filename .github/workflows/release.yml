@@ -3,13 +3,13 @@
 name: Release Build
 
 on:
-  push:
-    tags:
-      - '*'  # 匹配所有 tag
+  #push:
+    #tags:
+      #- '*'  # 匹配所有 tag
   workflow_dispatch:  # 添加手动触发选项
     inputs:
       tag_version:
-        description: '1.0.11'
+        description: 'input version'
         required: true
         type: string      
 
@@ -30,7 +30,7 @@ jobs:
 
       - name: Get tag version
         id: get_version
-        run: echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        run: echo "version=${{ github.event.inputs.custom_tag }}" >> $GITHUB_OUTPUT
 
       - name: Create output directory
         run: mkdir -p dist
