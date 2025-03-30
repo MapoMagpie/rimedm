@@ -6,6 +6,12 @@ on:
   push:
     tags:
       - '*'  # 匹配所有 tag
+  workflow_dispatch:  # 添加手动触发选项
+    inputs:
+      tag_version:
+        description: '1.0.11'
+        required: true
+        type: string      
 
 jobs:
   build:
