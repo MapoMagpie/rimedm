@@ -27,8 +27,11 @@ func (fe *FileEntries) String() string {
 	return fe.FilePath
 }
 
-func (fe *FileEntries) Order() int {
-	return int(fe.ID)
+func (fe *FileEntries) Cmp(ofe any) bool {
+	if o, ok := ofe.(*FileEntries); ok {
+		return fe.ID > o.ID
+	}
+	return false
 }
 
 func LoadItems(paths ...string) (fes []*FileEntries) {
@@ -118,7 +121,7 @@ func loadFromFile(path string, ch chan<- *FileEntries, wg *sync.WaitGroup) {
 				if len(bs) == 0 {
 					continue
 				}
-				fe.Entries = append(fe.Entries, NewEntry(bs, fe.ID, seek-int64(size), int64(size)))
+				fe.Entries = append(fe.Entries, NewEntry(bs, fe.ID, seek-int64(size), int64(size), &fe.Columns))
 			}
 			if eof != nil {
 				break

@@ -5,7 +5,7 @@ go 1.21.6
 require (
 	github.com/charmbracelet/bubbletea v0.25.0
 	github.com/goccy/go-yaml v1.11.3
-	github.com/junegunn/fzf v0.0.0-20240204100232-90b818788249
+	github.com/sahilm/fuzzy v0.1.1
 	golang.org/x/term v0.16.0
 )
 
@@ -13,6 +13,7 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/containerd/console v1.0.4 // indirect
 	github.com/fatih/color v1.16.0 // indirect
+	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 )
 
 func Test_LoadItems(t *testing.T) {
@@ -23,27 +22,27 @@ func Test_LoadItems(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(_ *testing.T) {
-			start := time.Now()
+			// start := time.Now()
 			fes := LoadItems(tt.args.path)
-			duration1 := time.Since(start)
-			fmt.Println("======================================================")
-			fmt.Println("fes >>", len(fes))
+			// duration1 := time.Since(start)
+			// fmt.Println("======================================================")
+			// fmt.Println("fes >>", len(fes))
 			entries := make([]*Entry, 0)
 			if len(fes) > 0 {
 				for _, fe := range fes {
-					fmt.Println("fe >>", fe.FilePath)
+					// fmt.Println("fe >>", fe.FilePath)
 					entries = append(entries, fe.Entries...)
-					for _, e := range fe.Entries {
-						fmt.Println("entry >>", string(e.raw))
-					}
+					// for _, e := range fe.Entries {
+					// 	fmt.Println("entry >>", string(e.raw))
+					// }
 				}
 			}
-			fmt.Println("count >>", len(entries))
+			// fmt.Println("count >>", len(entries))
 			if len(entries) != tt.want {
 				t.Errorf("Load Item Count = %v, want %v", len(entries), tt.want)
 			}
-			fmt.Println("======================================================")
-			fmt.Println("load duration >>", duration1)
+			// fmt.Println("======================================================")
+			// fmt.Println("load duration >>", duration1)
 		})
 	}
 }

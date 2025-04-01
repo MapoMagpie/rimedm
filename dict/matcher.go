@@ -3,28 +3,30 @@ package dict
 import (
 	"context"
 
-	"github.com/junegunn/fzf/src/algo"
-	"github.com/junegunn/fzf/src/util"
+	"github.com/sahilm/fuzzy"
 )
 
 type MatchResult struct {
-	Entry  *Entry
-	result algo.Result
+	Entry *Entry
+	score int
 }
 
 func (m *MatchResult) String() string {
 	return string(m.Entry.raw)
 }
 
-func (m *MatchResult) Order() int {
-	score := m.result.Score
-	score = score * (1000 - m.Entry.Chars().Length())
-	// * (10 * m.Entry.Weight)
-	return score
+func (m *MatchResult) Cmp(other any) bool {
+	if o, ok := other.(*MatchResult); ok {
+		if m.score == o.score {
+			return m.Entry.data.Weight > o.Entry.data.Weight
+		}
+		return m.score > o.score
+	}
+	return false
 }
 
 type Matcher interface {
-	Search(key []rune, list []*Entry, resultChan chan<- []*MatchResult, ctx context.Context)
+	Search(key string, useColumn Column, list []*Entry, resultChan chan<- []*MatchResult, ctx context.Context)
 	Reset()
 }
 
@@ -38,7 +40,7 @@ func (m *CacheMatcher) Reset() {
 
 // var slab = util.MakeSlab(200*1024, 4096)
 
-func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*MatchResult, ctx context.Context) {
+func (m *CacheMatcher) Search(key string, useColumn Column, list []*Entry, resultChan chan<- []*MatchResult, ctx context.Context) {
 	var done bool
 	go func() {
 		<-ctx.Done()
@@ -69,26 +71,45 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*Ma
 		}
 	}
 
-	matched := make([]*MatchResult, 0)
-	var slab = util.MakeSlab(200*1024, 4096)
-	lastIdx := 0
-	listLen := len(list)
-	chunkSize := 50000 // chunkSize = listLen means no async search
-	for idx, entry := range list {
-		if done {
-			return
-		}
-		if !entry.IsDelete() {
-			result, _ := algo.FuzzyMatchV2(false, true, true, entry.Chars(), key, false, slab)
-			if result.Score > 0 {
-				matched = append(matched, &MatchResult{entry, result})
+	getTarget := func(entry *Entry) string {
+		return entry.data.Code
+	}
+	if useColumn != COLUMN_CODE {
+		if useColumn == COLUMN_TEXT {
+			getTarget = func(entry *Entry) string {
+				return entry.data.Text
+			}
+		} else {
+			getTarget = func(entry *Entry) string {
+				return entry.raw
 			}
 		}
-		if (idx%chunkSize == 0 && idx != 0) || idx == listLen-1 {
-			m2 := matched[lastIdx:]
-			resultChan <- m2
-			// log.Printf("Cache Matcher Search: Key: %s, Send result: %d", string(key), len(m2))
-			lastIdx = len(matched)
+	}
+
+	matched := make([]*MatchResult, 0)
+	listLen := len(list)
+	chunkSize := 50000 // chunkSize = listLen means no async search
+	for c := 0; c < listLen; c += chunkSize {
+		end := c + chunkSize
+		if end > listLen {
+			end = listLen
+		}
+		chunk := list[c:end]
+		source := &ChunkSource{chunk, getTarget}
+		matches := fuzzy.FindFromNoSort(key, source)
+		if len(matches) == 0 {
+			continue
+		}
+		ret := make([]*MatchResult, 0, len(matches))
+		for _, ma := range matches {
+			if chunk[ma.Index].IsDelete() { // cache matcher still need to determine whether it has been deleted
+				continue
+			}
+			ret = append(ret, &MatchResult{chunk[ma.Index], ma.Score})
+		}
+		if len(ret) > 0 {
+			resultChan <- ret
+			matched = append(matched, ret...)
 		}
 	}
 	// log.Printf("Cache Matcher Search: Key: %s, List Len: %d, Cached: %v, Matched: %d", string(key), listLen, cache != nil, len(matched))
@@ -96,4 +117,17 @@ func (m *CacheMatcher) Search(key []rune, list []*Entry, resultChan chan<- []*Ma
 		m.cache = make(map[string][]*MatchResult)
 	}
 	m.cache[string(key)] = matched
+}
+
+type ChunkSource struct {
+	chunk     []*Entry
+	getTarget func(e *Entry) string
+}
+
+func (e *ChunkSource) Len() int {
+	return len(e.chunk)
+}
+
+func (e *ChunkSource) String(i int) string {
+	return e.getTarget(e.chunk[i])
 }

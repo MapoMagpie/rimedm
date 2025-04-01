@@ -20,9 +20,7 @@ func exportDict(path string, fes []*FileEntries) {
 			continue
 		}
 		for _, entry := range fe.Entries {
-			bs := entry.Raw()
-			bs = append(bs, '\n')
-			_, err := file.Write(bs)
+			_, err := file.WriteString(entry.Raw() + "\t")
 			if err != nil {
 				panic(err)
 			}
@@ -77,7 +75,7 @@ func outputFile(rawBs *[]byte, path string, entries []*Entry) (changed bool) {
 			entry.Saved()
 			modType = "DEL"
 		case MODIFY:
-			nbs := entry.Raw()
+			nbs := []byte(entry.Raw())
 			nbs = append(nbs, '\n')
 			bs = append(bs[:entry.seek], append(nbs, bs[entry.seek+entry.rawSize:]...)...)
 			seekFixed = seekFixed - entry.rawSize + int64(len(nbs))

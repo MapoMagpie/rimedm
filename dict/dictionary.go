@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/junegunn/fzf/src/util"
+	"github.com/MapoMagpie/rimedm/util"
 )
 
 type Dictionary struct {
@@ -37,7 +37,7 @@ func (d *Dictionary) Entries() []*Entry {
 	return d.entries
 }
 
-func (d *Dictionary) Search(key []rune, resultChan chan<- []*MatchResult, ctx context.Context) {
+func (d *Dictionary) Search(key string, useColumn Column, resultChan chan<- []*MatchResult, ctx context.Context) {
 	// log.Println("search key: ", string(key))
 	if len(key) == 0 {
 		done := false
@@ -46,8 +46,8 @@ func (d *Dictionary) Search(key []rune, resultChan chan<- []*MatchResult, ctx co
 			done = true
 		}()
 		list := d.Entries()
-		deleteCount := 0
 		ret := make([]*MatchResult, len(list))
+		deleteCount := 0 // for ret (len = list), if skip deleted, shrink ret
 		for i, entry := range list {
 			if done {
 				return
@@ -60,7 +60,7 @@ func (d *Dictionary) Search(key []rune, resultChan chan<- []*MatchResult, ctx co
 		}
 		resultChan <- ret[0 : len(ret)-deleteCount]
 	} else {
-		d.matcher.Search(key, d.Entries(), resultChan, ctx)
+		d.matcher.Search(key, useColumn, d.Entries(), resultChan, ctx)
 	}
 }
 
@@ -113,17 +113,16 @@ type Entry struct {
 	seek    int64
 	rawSize int64
 	modType ModifyType
-	raw     []byte
+	raw     string
 	deleted bool
+	data    Data
 }
 
 func (e *Entry) Data() *Data {
-	pair, cols := ParseInput(string(e.raw))
-	data, _ := ParseData(pair, cols)
-	return data
+	return &e.data
 }
 
-func (e *Entry) ReRaw(raw []byte) {
+func (e *Entry) ReRaw(raw string) {
 	e.raw = raw
 	if e.modType != ADD {
 		e.modType = MODIFY
@@ -134,13 +133,6 @@ func (e *Entry) ReRaw(raw []byte) {
 func (e *Entry) reSeek(seek int64, rawSize int64) {
 	e.seek = seek
 	e.rawSize = rawSize
-}
-
-// for fzf match
-func (e *Entry) Chars() *util.Chars {
-	// TODO: store chars
-	chars := util.ToChars(e.raw)
-	return &chars
 }
 
 func (e *Entry) Delete() {
@@ -155,7 +147,7 @@ func (e *Entry) IsDelete() bool {
 	return e.deleted
 }
 
-func (e *Entry) Raw() []byte {
+func (e *Entry) Raw() string {
 	// return e.text.ToString() + "\t" + e.refFile
 	return e.raw
 }
@@ -167,6 +159,8 @@ func (e *Entry) Saved() {
 
 // Parse input string to a pair of strings
 // 支持乱序输入，如 "你好 nau 1" 或 "nau 1 你好"
+// 解析规则：将原始内容通过空白字符分割成单元，依次判断每个单元是否是汉字、纯数字、ascii，
+// 汉字将作为text，纯数字作为weight，其他ascii根据顺序，第一个为code，其余皆为stem(造字码)
 func ParseInput(raw string) ([]string, []Column) {
 	pair := make([]string, 0)
 	cols := make([]Column, 0)
@@ -178,14 +172,14 @@ func ParseInput(raw string) ([]string, []Column) {
 		if len(split) == 0 {
 			continue
 		}
-		if isNumber(split) {
+		if util.IsNumber(split) {
 			cols = append(cols, COLUMN_WEIGHT)
 			pair = append(pair, split)
 			continue
 		}
-		if isAscii(split) {
-			stemIndex := slices.Index(cols, COLUMN_STEM)
+		if util.IsAscii(split) {
 			codeIndex := slices.Index(cols, COLUMN_CODE)
+			stemIndex := slices.Index(cols, COLUMN_STEM)
 			if codeIndex == -1 {
 				cols = append(cols, COLUMN_CODE)
 				pair = append(pair, split)
@@ -209,36 +203,29 @@ func ParseInput(raw string) ([]string, []Column) {
 			pair[textIndex] = pair[textIndex] + " " + split
 		}
 	}
+	if textIndex == -1 { // 仍旧没有汉字，将code作为text, stem作为text
+		codeIndex := slices.Index(cols, COLUMN_CODE)
+		stemIndex := slices.Index(cols, COLUMN_STEM)
+		if codeIndex != -1 {
+			cols[codeIndex] = COLUMN_TEXT
+			if stemIndex != -1 {
+				cols[stemIndex] = COLUMN_CODE
+			}
+		}
+
+	}
 	return pair, cols
 }
 
-func isNumber(str string) bool {
-	for _, r := range str {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return true
-}
-
-func isAscii(str string) bool {
-	for _, r := range str {
-		if r >= 0x80 {
-			return false
-		}
-	}
-	return true
-}
-
-func ParseData(pair []string, columns []Column) (*Data, error) {
-	if len(pair) != len(columns) {
-		return nil, errors.New("raw")
+func ParseData(pair []string, columns *[]Column) (Data, error) {
+	if len(pair) != len(*columns) {
+		return Data{}, errors.New("raw")
 	}
 	var data Data
 	data.cols = columns
 	for i := 0; i < len(pair); i++ {
 		term := pair[i]
-		col := columns[i]
+		col := (*columns)[i]
 		switch col {
 		case COLUMN_TEXT:
 			data.Text = term
@@ -252,24 +239,55 @@ func ParseData(pair []string, columns []Column) (*Data, error) {
 			continue
 		}
 	}
-	return &data, nil
+	return data, nil
 }
 
-func NewEntry(raw []byte, fileID uint8, seek int64, size int64) *Entry {
+func fastParseData(raw string, cols *[]Column) Data {
+	split := strings.Split(raw, "\t")
+	colsLen := len(*cols)
+	data := Data{cols: cols}
+	for s, c := 0, 0; s < len(split) && c < colsLen; {
+		sp := split[s]
+		col := (*cols)[c]
+		c++
+		s++
+		switch col {
+		case COLUMN_TEXT:
+			data.Text = sp
+		case COLUMN_WEIGHT:
+			weight, err := strconv.Atoi(sp)
+			if err != nil { // 不是weight，可能是code，跳到下一col，但重新处理当前sp
+				s--
+			}
+			data.Weight = weight
+		case COLUMN_CODE: // 如果code列缺失，则可能导致之后的weight或stem作为code，如 code: 100，暂未处理
+			data.Code = sp
+		case COLUMN_STEM:
+			data.Stem = sp
+		}
+	}
+	return data
+}
+
+func NewEntry(raw []byte, fileID uint8, seek int64, size int64, cols *[]Column) *Entry {
+	str := string(raw)
+	data := fastParseData(str, cols)
 	return &Entry{
 		FID:     fileID,
 		modType: NC,
 		seek:    seek,
 		rawSize: size,
-		raw:     raw,
+		raw:     str,
+		data:    data,
 	}
 }
 
-func NewEntryAdd(raw []byte, fileID uint8) *Entry {
+func NewEntryAdd(raw string, fileID uint8, data Data) *Entry {
 	return &Entry{
 		FID:     fileID,
 		modType: ADD,
 		raw:     raw,
+		data:    data,
 	}
 }
 
@@ -278,42 +296,42 @@ type Data struct {
 	Code   string
 	Stem   string
 	Weight int
-	cols   []Column
+	cols   *[]Column
 }
 
-func (d *Data) ToBytes() []byte {
-	return d.ToBytesWithColumns(d.cols)
+func (d *Data) ToString() string {
+	return d.ToStringWithColumns(d.cols)
 }
 
-func (d *Data) ToBytesWithColumns(cols []Column) []byte {
-	bs := make([]byte, 0)
-	for _, col := range cols {
-		var b []byte
+func (d *Data) ToStringWithColumns(cols *[]Column) string {
+	sb := strings.Builder{}
+	for _, col := range *cols {
+		var b string
 		switch col {
 		case COLUMN_TEXT:
-			b = []byte(d.Text)
+			b = d.Text
 		case COLUMN_WEIGHT:
-			b = []byte(strconv.Itoa(d.Weight))
+			b = strconv.Itoa(d.Weight)
 		case COLUMN_CODE:
-			b = []byte(d.Code)
+			b = d.Code
 		case COLUMN_STEM:
-			b = []byte(d.Stem)
+			b = d.Stem
 		}
-		if len(bs) > 0 {
-			bs = append(bs, '\t')
+		if sb.Len() > 0 {
+			sb.WriteByte('\t')
 		}
-		bs = append(bs, b...)
+		sb.WriteString(b)
 	}
-	return bs
+	return sb.String()
 }
 
-type Column uint8
+type Column string
 
 const (
-	COLUMN_TEXT   Column = 0
-	COLUMN_CODE   Column = 1
-	COLUMN_WEIGHT Column = 2
-	COLUMN_STEM   Column = 3
+	COLUMN_TEXT   Column = "TEXT"
+	COLUMN_CODE   Column = "CODE"
+	COLUMN_WEIGHT Column = "WEIGHT"
+	COLUMN_STEM   Column = "STEM"
 )
 
 var DEFAULT_COLUMNS = []Column{COLUMN_TEXT, COLUMN_WEIGHT, COLUMN_CODE, COLUMN_STEM}

@@ -23,19 +23,19 @@ func FreshListCmd() tea.Msg {
 	return FreshListMsg(1)
 }
 
+type ItemRender interface {
+	String() string
+	Cmp(other any) bool
+}
+
 type StringRender string
 
 func (h StringRender) String() string {
 	return string(h)
 }
 
-func (h StringRender) Order() int {
-	return 0
-}
-
-type ItemRender interface {
-	String() string
-	Order() int
+func (h StringRender) Cmp(_ any) bool {
+	return true
 }
 
 type Menu struct {
@@ -69,7 +69,7 @@ func (l *ListManager) List() []ItemRender {
 	}
 	if l.getVer != l.setVer {
 		sort.Slice(list, func(i, j int) bool {
-			return list[i].Order()-list[j].Order() > 0
+			return list[i].Cmp(list[j])
 		})
 		l.getVer = l.setVer
 	}
@@ -198,16 +198,20 @@ func (m *Model) inputCtl(key string) {
 			m.InputCursor++
 		}
 	default:
+		// 过滤组合键，如shift+j ctrl+left
+		if strings.Contains(key, "shift+") || strings.Contains(key, "ctrl+") || strings.Contains(key, "alt+") {
+			return
+		}
 		if key == "tab" {
 			key = "\t"
 		}
+		split := strings.Split(key, "")
 		if m.InputCursor < len(m.Inputs) {
-			m.Inputs = append(m.Inputs[:m.InputCursor+1], m.Inputs[m.InputCursor:]...)
-			m.Inputs[m.InputCursor] = key
+			m.Inputs = append(m.Inputs[:m.InputCursor], append(split, m.Inputs[m.InputCursor:]...)...)
 		} else {
-			m.Inputs = append(m.Inputs, key)
+			m.Inputs = append(m.Inputs, split...)
 		}
-		m.InputCursor++
+		m.InputCursor += len(split)
 		m.FreshList()
 	}
 }

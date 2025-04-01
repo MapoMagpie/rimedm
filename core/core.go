@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"os/exec"
 	"slices"
 	"sort"
 	"strings"
@@ -16,7 +17,6 @@ import (
 	mutil "github.com/MapoMagpie/rimedm/util"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/junegunn/fzf/src/util"
 )
 
 func Start(opts *Options) {
@@ -24,7 +24,7 @@ func Start(opts *Options) {
 	start := time.Now()
 	fes := dict.LoadItems(opts.DictPaths...)
 	sort.Slice(fes, func(i, j int) bool {
-		return fes[i].Order() < fes[j].Order()
+		return fes[i].Cmp(fes[j])
 	})
 	since := time.Since(start)
 	log.Printf("Load %s: %s\n", opts.DictPaths, since)
@@ -62,7 +62,7 @@ func Start(opts *Options) {
 		if len(pair) == 0 {
 			return tui.ExitMenuCmd
 		}
-		data, _ := dict.ParseData(pair, cols)
+		data, _ := dict.ParseData(pair, &cols)
 		curr, err := listManager.Curr()
 		if err == nil {
 			// 自动修改权重
@@ -74,7 +74,7 @@ func Start(opts *Options) {
 			}
 		}
 		fe := file.(*dict.FileEntries)
-		dc.Add(dict.NewEntryAdd(data.ToBytesWithColumns(fe.Columns), fe.ID))
+		dc.Add(dict.NewEntryAdd(data.ToStringWithColumns(&fe.Columns), fe.ID, data))
 		log.Printf("add item: %s\n", pair)
 		m.Inputs = strings.Split(data.Code, "")
 		m.InputCursor = len(m.Inputs)
@@ -126,12 +126,12 @@ func Start(opts *Options) {
 		case *dict.MatchResult:
 			pair, cols := dict.ParseInput(raw)
 			if len(pair) > 1 {
-				data, _ := dict.ParseData(pair, cols)
+				data, _ := dict.ParseData(pair, &cols)
 				feIndex := slices.IndexFunc(fes, func(fe *dict.FileEntries) bool {
 					return fe.ID == item.Entry.FID
 				})
 				if feIndex > -1 {
-					item.Entry.ReRaw(data.ToBytesWithColumns(fes[feIndex].Columns))
+					item.Entry.ReRaw(data.ToStringWithColumns(&fes[feIndex].Columns))
 					log.Printf("modify confirm item: %s\n", item)
 				}
 				m.Inputs = strings.Split(data.Code, "")
@@ -229,7 +229,7 @@ func Start(opts *Options) {
 				changed = true
 			}
 			if changed {
-				currEntry.ReRaw(currEntryData.ToBytes())
+				currEntry.ReRaw(currEntryData.ToString())
 				listManager.ReSort()
 				list := listManager.List()
 				// 重新设置 listManager 的 currIndex为当前修改的项
@@ -278,24 +278,37 @@ func Start(opts *Options) {
 		hasAppend := false
 		for {
 			select {
-			case raw := <-searchChan:
+			case raw := <-searchChan: // 等待搜索term
 				listManager.NewList()
 				ctx, cancel := context.WithCancel(context.Background())
 				if cancelFunc != nil {
 					cancelFunc()
 				}
 				cancelFunc = cancel
-				rs := []rune(raw)
+				var rs string
+				useColumn := dict.COLUMN_CODE
 				if len(raw) > 0 {
 					// if the input has code(码) then change the rs(search term) to code
 					pairs, cols := dict.ParseInput(raw)
-					codeIndex := slices.Index(cols, dict.COLUMN_CODE)
-					if codeIndex != -1 {
-						rs = []rune(pairs[codeIndex])
+					if len(pairs) > 0 {
+						codeIndex := slices.Index(cols, dict.COLUMN_CODE)
+						if codeIndex != -1 {
+							useColumn = dict.COLUMN_CODE
+							rs = pairs[codeIndex]
+						} else {
+							if len(pairs) == 1 && mutil.IsAscii(pairs[0]) {
+								useColumn = dict.COLUMN_CODE
+								rs = pairs[0]
+							} else {
+								textIndex := slices.Index(cols, dict.COLUMN_TEXT)
+								useColumn = dict.COLUMN_TEXT
+								rs = pairs[textIndex]
+							}
+						}
 					}
 				}
-				go dc.Search(rs, resultChan, ctx)
-			case ret := <-resultChan:
+				go dc.Search(rs, useColumn, resultChan, ctx)
+			case ret := <-resultChan: // 等待搜索结果
 				list := make([]tui.ItemRender, len(ret))
 				for i, entry := range ret {
 					list[i] = entry
@@ -332,7 +345,11 @@ func FlushAndSync(opts *Options, dc *dict.Dictionary, sync bool) {
 	}
 	if dc.Flush() && opts.RestartRimeCmd != "" {
 		// TODO: check RestartRimeCmd, if weasel updated, the program path may be changed
-		cmd := util.ExecCommand(opts.RestartRimeCmd, false)
+		shell := os.Getenv("SHELL")
+		if len(shell) == 0 {
+			shell = "sh"
+		}
+		cmd := exec.Command(shell, "-c", opts.RestartRimeCmd)
 		err := cmd.Run()
 		if err != nil {
 			panic(fmt.Errorf("exec restart rime cmd error:%v", err))

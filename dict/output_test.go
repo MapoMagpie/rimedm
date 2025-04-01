@@ -1,7 +1,6 @@
 package dict
 
 import (
-	"fmt"
 	"os"
 	"testing"
 )
@@ -148,8 +147,8 @@ columns:
 				filename := createFile("./tmp/test_outputfile3.yaml", content1)
 				fe := LoadItems(filename)[0]
 				fe.Entries[0].Delete()
-				fe.Entries[1].ReRaw([]byte("早早\tzaozao"))
-				fe.Entries[2].ReRaw([]byte("测试\tceshi"))
+				fe.Entries[1].ReRaw("早早\tzaozao")
+				fe.Entries[2].ReRaw("测试\tceshi")
 				return fe
 			}(),
 			want:          content1_want3,
@@ -163,13 +162,10 @@ columns:
 				fe := LoadItems(filename)[0]
 				fe.Entries[0].Delete()
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
-				fmt.Println("---------------")
-				fe.Entries[1].ReRaw([]byte("早早\tzaozao"))
+				fe.Entries[1].ReRaw("早早\tzaozao")
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
-				fmt.Println("---------------")
-				fe.Entries[2].ReRaw([]byte("测试\tceshi"))
+				fe.Entries[2].ReRaw("测试\tceshi")
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
-				fmt.Println("---------------")
 				return fe
 			}(),
 			want:          content1_want3,
@@ -183,10 +179,8 @@ columns:
 				fe := LoadItems(filename)[0]
 				fe.Entries[0].Delete()
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
-				fmt.Println("---------------")
 				fe.Entries[2].Delete()
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
-				fmt.Println("---------------")
 				return fe
 			}(),
 			want:          content1_want2,
@@ -200,10 +194,10 @@ columns:
 				fe := LoadItems(filename)[0]
 				fe.Entries[0].Delete()
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
-				fmt.Println("---------------")
+
 				fe.Entries[2].Delete()
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
-				fmt.Println("---------------")
+
 				return fe
 			}(),
 			want:          content2_want1,
@@ -217,10 +211,8 @@ columns:
 				fe := LoadItems(filename)[0]
 				fe.Entries[0].Delete()
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
-				fmt.Println("---------------")
 				fe.Entries[2].Delete()
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
-				fmt.Println("---------------")
 				return fe
 			}(),
 			want:          content3_want1,
@@ -234,23 +226,22 @@ columns:
 				fe := LoadItems(filename)[0]
 
 				// new entry then just delete
-				ne0 := NewEntryAdd([]byte("萌子	lohi	1"), 0)
+				ne0 := NewEntryAdd("萌子	lohi	1", 0, Data{})
 				fe.Entries = append(fe.Entries, ne0)
 				// outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
 				ne0.Delete()
 
-				ne1 := NewEntryAdd([]byte("萌子	lohi	1"), 0)
+				ne1 := NewEntryAdd("萌子	lohi	1", 0, Data{})
 				fe.Entries = append(fe.Entries, ne1)
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
 				ne1.Delete()
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
-
-				ne2 := NewEntryAdd([]byte("伊藤	jblv	1"), 0)
+				ne2 := NewEntryAdd("伊藤	jblv	1", 0, Data{})
 				fe.Entries = append(fe.Entries, ne2)
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
-				ne2.ReRaw([]byte("伊藤	jblv	10"))
+				ne2.ReRaw("伊藤	jblv	10")
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
-				ne2.ReRaw([]byte("伊藤萌子	jllh	10"))
+				ne2.ReRaw("伊藤萌子	jllh	10")
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
 				return fe
 			}(),
@@ -265,7 +256,7 @@ columns:
 				fe := LoadItems(filename)[0]
 				de := fe.Entries[1]
 				d1 := fe.Entries[2]
-				d1.ReRaw([]byte("测	ceek	10"))
+				d1.ReRaw("测	ceek	10")
 				de.Delete()
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
 				de.Delete()
