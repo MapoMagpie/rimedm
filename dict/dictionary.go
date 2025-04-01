@@ -38,7 +38,7 @@ func (d *Dictionary) Entries() []*Entry {
 }
 
 func (d *Dictionary) Search(key []rune, resultChan chan<- []*MatchResult, ctx context.Context) {
-	log.Println("search key: ", string(key))
+	// log.Println("search key: ", string(key))
 	if len(key) == 0 {
 		done := false
 		go func() {

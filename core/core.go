@@ -13,6 +13,7 @@ import (
 
 	"github.com/MapoMagpie/rimedm/dict"
 	"github.com/MapoMagpie/rimedm/tui"
+	mutil "github.com/MapoMagpie/rimedm/util"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/junegunn/fzf/src/util"
@@ -178,7 +179,8 @@ func Start(opts *Options) {
 		},
 	}
 
-	// 修改权重
+	// 修改权重，这是一个高频操作，通过debouncer延迟同步到文件。
+	modifyWeightDebouncer := mutil.NewDebouncer(time.Millisecond * 1000) // 一秒后
 	modifyWeightEvent := &tui.Event{
 		Keys: []string{"ctrl+up", "ctrl+down", "ctrl+left", "ctrl+right"},
 		Cb: func(key string, m *tui.Model) (tea.Model, tea.Cmd) {
@@ -230,7 +232,6 @@ func Start(opts *Options) {
 				currEntry.ReRaw(currEntryData.ToBytes())
 				listManager.ReSort()
 				list := listManager.List()
-
 				// 重新设置 listManager 的 currIndex为当前修改的项
 				for i, item := range list {
 					if item.(*dict.MatchResult).Entry == currEntry {
@@ -238,6 +239,10 @@ func Start(opts *Options) {
 						break
 					}
 				}
+				// 延迟同步到文件
+				modifyWeightDebouncer.Do(func() {
+					FlushAndSync(opts, dc, opts.SyncOnChange)
+				})
 			}
 			return m, func() tea.Msg { return 0 } // trigger bubbletea update
 		},
@@ -265,6 +270,7 @@ func Start(opts *Options) {
 	model := tui.NewModel(listManager, menuFetcher, events...)
 	teaProgram := tea.NewProgram(model)
 
+	// 输入处理 搜索
 	go func() {
 		var cancelFunc context.CancelFunc
 		resultChan := make(chan []*dict.MatchResult)
@@ -312,7 +318,15 @@ func Start(opts *Options) {
 	}
 }
 
+var lock *mutil.FLock = mutil.NewFLock()
+
+// 同步变更到文件中，如果启用了自动部署Rime的功能则调用部署指令
 func FlushAndSync(opts *Options, dc *dict.Dictionary, sync bool) {
+	// 此操作的阻塞的，但可能被异步调用，因此加上防止重复调用机制
+	if lock.Should() {
+		return
+	}
+	defer lock.Done()
 	if !sync {
 		return
 	}

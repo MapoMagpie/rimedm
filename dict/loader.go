@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/MapoMagpie/rimedm/util"
 	"github.com/goccy/go-yaml"
 )
 
@@ -65,7 +66,7 @@ var (
 
 func loadFromFile(path string, ch chan<- *FileEntries, wg *sync.WaitGroup) {
 	defer wg.Done()
-	fe := &FileEntries{FilePath: path, Entries: make([]*Entry, 0), ID: idgen.NextID()}
+	fe := &FileEntries{FilePath: path, Entries: make([]*Entry, 0), ID: util.IDGen.NextID()}
 	file, err := os.OpenFile(path, os.O_RDONLY, 0666)
 	if fe.Err = err; err != nil {
 		ch <- fe

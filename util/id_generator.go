@@ -1,4 +1,4 @@
-package dict
+package util
 
 import "sync"
 
@@ -8,7 +8,7 @@ type IDGenerator struct {
 }
 
 var (
-	idgen *IDGenerator = &IDGenerator{currentID: 0}
+	IDGen *IDGenerator = &IDGenerator{currentID: 0}
 )
 
 func (gen *IDGenerator) NextID() uint8 {
