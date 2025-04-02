@@ -8,6 +8,36 @@ import (
 )
 
 func Test_LoadItems_xhup(t *testing.T) {
+	content := `
+# coding: utf-8
+# 用户词库
+# 与系统词条重码时居后，如想居前，请把词条放到flypy_top.txt文件内
+# 
+# 编码格式：字词+Tab符+编码（用户词库本身有重码则还需后面+Tab符+权重，权重大者居前，权重数字随意）
+#
+#    -------- 强调一下 --------
+# 
+#   词条和编码之间的不是空格，而是Tab符
+#   按住键盘 G 键，切换到功能键盘，使用上面的Tab键
+# 
+#    -------------------------------
+# 
+# 系统次选词放在flypy_sys.txt文件内，可修改删除
+# 简词补全放本文件内，不需要可删除
+# 用户词库，下行开始添加，编码格式见上，部署后生效
+
+# 全码词
+即使	jiui
+回忆	hvyi
+华为	hxww
+一边	yibm
+两边	llbm
+整句	vgju
+按键	anjm
+单元	djyr
+反思	fjsi`
+	filename := createFile("./flypy_user.txt", content)
+	defer os.RemoveAll("./flypy_user.txt")
 	cols := []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT}
 	tests := []struct {
 		name     string
@@ -15,7 +45,7 @@ func Test_LoadItems_xhup(t *testing.T) {
 		want     []Data
 	}{
 		{
-			name: "xhup", filename: "../rime/xhup/flypy_user.txt",
+			name: "xhup", filename: filename,
 			want: []Data{
 				{Text: "即使", Code: "jiui", cols: &cols},
 				{Text: "回忆", Code: "hvyi", cols: &cols},
@@ -66,6 +96,7 @@ func Test_LoadItems(t *testing.T) {
 	}{
 		{"xkdj", args{filenames[0]}, 20},
 		{"tigress", args{filenames[1]}, 14},
+		{"onlyhead", args{filenames[2]}, 4},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(_ *testing.T) {
@@ -253,6 +284,31 @@ encoder:
 
 `
 	createFile("./tmp/tigress_simp_ci.dict.yaml", content)
+	content = `
+name: onlyhead
+version: "2025.03.07"
+sort: by_weight
+import_tables:
+  - onlyhead_extend
+  - onlyhead_user
+#  - tigress_user
+`
+	filenames = append(filenames, createFile("./tmp/onlyhead.dict.yaml", content))
+	content = `
+name: onlyhead
+version: "2025.03.07"
+sort: by_weight
+...
+
+那个	5000	a
+如果	5000	b
+`
+	createFile("./tmp/onlyhead_extend.dict.yaml", content)
+	content = `
+不是	5000	c
+哪个	5000	d
+`
+	createFile("./tmp/onlyhead_user.dict.yaml", content)
 	return filenames
 }
 

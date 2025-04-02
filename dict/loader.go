@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 
 	"github.com/MapoMagpie/rimedm/util"
@@ -67,8 +68,8 @@ func LoadItems(paths ...string) (fes []*FileEntries) {
 }
 
 var (
-	YAML_BEGIN = []byte{'-', '-', '-'}
-	YAML_END   = []byte{'.', '.', '.'}
+	YAML_BEGIN = "---"
+	YAML_END   = "..."
 )
 
 func loadFromFile(path string, ch chan<- *FileEntries, wg *sync.WaitGroup) {
@@ -147,22 +148,34 @@ func tryReadHead(buf *bytes.Buffer) (*bytes.Buffer, int64, bool) {
 	var size int64 = 0
 	lines := 0
 	headBuf := bytes.NewBuffer(make([]byte, 0))
+	hasDictName := false
 	for {
 		bs, eof := buf.ReadBytes('\n')
 		headBuf.Write(bs) // keep original content
 		size += int64(len(bs))
 		lines += 1
 		if size > 0 {
-			if bytes.Equal(bytes.TrimSpace(bs), YAML_BEGIN) {
+			line := strings.TrimSpace(string(bs))
+			if line == YAML_BEGIN {
 				continue
 			}
-			if bytes.Equal(bytes.TrimSpace(bs), YAML_END) {
+			if strings.Index(line, "name:") == 0 {
+				hasDictName = true
+			}
+			if line == YAML_END {
 				return headBuf, size, true
 			}
 		}
 		if eof != nil || lines > 1000 { // 我不信有人的rime dict文件中，yaml部分能超过1000行。
 			break
 		}
+	}
+	// 正常运行到这里表示文件已读完，但是没有 YAML_END，
+	// 这个文件可能是无头的码表 像小鹤的txt码表那样
+	// 也可能只有yaml head，却没有 YAML_END 标志，
+	// 因此通过判断存在`name: xmjd6.extended`这样的行 来确定此文件仅包含yaml head
+	if hasDictName {
+		return headBuf, size, true
 	}
 	return headBuf, size, false
 }
