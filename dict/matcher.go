@@ -11,6 +11,10 @@ type MatchResult struct {
 	score int
 }
 
+func (m *MatchResult) Id() int {
+	return int(m.Entry.FID)
+}
+
 func (m *MatchResult) String() string {
 	return string(m.Entry.raw)
 }

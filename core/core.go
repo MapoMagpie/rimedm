@@ -45,7 +45,7 @@ func Start(opts *Options) {
 	listManager.SetFiles(fileNames)
 
 	// 添加菜单
-	menuNameAdd := tui.Menu{Name: "Add", Cb: func(m *tui.Model) (cmd tea.Cmd) {
+	menuNameAdd := tui.Menu{Name: "A添加", Cb: func(m *tui.Model) (cmd tea.Cmd) {
 		if len(m.Inputs) == 0 {
 			return tui.ExitMenuCmd
 		}
@@ -84,7 +84,7 @@ func Start(opts *Options) {
 	}}
 
 	// 删除菜单
-	menuNameDelete := tui.Menu{Name: "Delete", Cb: func(m *tui.Model) (cmd tea.Cmd) {
+	menuNameDelete := tui.Menu{Name: "D删除", Cb: func(m *tui.Model) (cmd tea.Cmd) {
 		item, err := m.CurrItem()
 		if err != nil {
 			m.Inputs = []string{}
@@ -103,7 +103,7 @@ func Start(opts *Options) {
 
 	// 修改菜单
 	var modifyingItem tui.ItemRender
-	menuNameModify := tui.Menu{Name: "Modify", Cb: func(m *tui.Model) (cmd tea.Cmd) {
+	menuNameModify := tui.Menu{Name: "M修改", Cb: func(m *tui.Model) (cmd tea.Cmd) {
 		item, err := m.CurrItem()
 		if err != nil {
 			m.Inputs = []string{}
@@ -119,7 +119,7 @@ func Start(opts *Options) {
 	}}
 
 	// 确认修改菜单
-	menuNameConfirm := tui.Menu{Name: "Confirm", Cb: func(m *tui.Model) tea.Cmd {
+	menuNameConfirm := tui.Menu{Name: "确认", Cb: func(m *tui.Model) tea.Cmd {
 		m.Modifying = false
 		raw := strings.Join(m.Inputs, "")
 		switch item := modifyingItem.(type) {
@@ -212,11 +212,11 @@ func Start(opts *Options) {
 					}
 				}
 				if key == "ctrl+up" && next != nil {
-					currEntryData.Weight = int(math.Max(1, float64(next.Data().Weight+1)))
+					currEntryData.Weight = int(math.Max(1, float64(next.Data().Weight-1)))
 					changed = true
 				}
 				if key == "ctrl+down" && prev != nil {
-					currEntryData.Weight = int(math.Max(1, float64(prev.Data().Weight-1)))
+					currEntryData.Weight = int(math.Max(1, float64(prev.Data().Weight+1)))
 					changed = true
 				}
 			}
@@ -240,6 +240,7 @@ func Start(opts *Options) {
 					}
 				}
 				// 延迟同步到文件
+				// log.Println("modify weight sync: ", currEntry.Raw())
 				modifyWeightDebouncer.Do(func() {
 					FlushAndSync(opts, dc, opts.SyncOnChange)
 				})
@@ -256,6 +257,14 @@ func Start(opts *Options) {
 			return m, func() tea.Msg { return 0 } // trigger bubbletea update
 		},
 	}
+	// 重新部署，强制保存变更到文件，并执行rime部署指令。
+	redeployEvent := &tui.Event{
+		Keys: []string{"ctrl+s"},
+		Cb: func(_ string, m *tui.Model) (tea.Model, tea.Cmd) {
+			FlushAndSync(opts, dc, true)
+			return m, nil
+		},
+	}
 
 	// new model
 	events := []*tui.Event{
@@ -264,6 +273,7 @@ func Start(opts *Options) {
 		tui.ClearInputEvent,
 		exitEvent,
 		exportDictEvent,
+		redeployEvent,
 		modifyWeightEvent,
 		showHelpEvent,
 	}
@@ -336,7 +346,7 @@ var lock *mutil.FLock = mutil.NewFLock()
 // 同步变更到文件中，如果启用了自动部署Rime的功能则调用部署指令
 func FlushAndSync(opts *Options, dc *dict.Dictionary, sync bool) {
 	// 此操作的阻塞的，但可能被异步调用，因此加上防止重复调用机制
-	if lock.Should() {
+	if !lock.Should() {
 		return
 	}
 	defer lock.Done()

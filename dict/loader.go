@@ -23,6 +23,10 @@ type FileEntries struct {
 	ID       uint8
 }
 
+func (fe *FileEntries) Id() int {
+	return int(fe.ID)
+}
+
 func (fe *FileEntries) String() string {
 	return fe.FilePath
 }

@@ -34,7 +34,7 @@ var MoveEvent = &Event{
 	Cb: func(key string, m *Model) (tea.Model, tea.Cmd) {
 		list := m.lm.List()
 		currIndex := &m.lm.currIndex
-		if m.ShowMenu && m.CurrMenu().Name == "Add" {
+		if m.ShowMenu && m.CurrMenu().Name == "A添加" {
 			list = m.lm.files
 			currIndex = &m.lm.fileIndex
 		}

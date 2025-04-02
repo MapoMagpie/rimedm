@@ -4,7 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -24,11 +27,16 @@ func FreshListCmd() tea.Msg {
 }
 
 type ItemRender interface {
+	Id() int
 	String() string
 	Cmp(other any) bool
 }
 
 type StringRender string
+
+func (h StringRender) Id() int {
+	return 0
+}
 
 func (h StringRender) String() string {
 	return string(h)
@@ -82,15 +90,21 @@ func (l *ListManager) Files() []ItemRender {
 
 func (l *ListManager) Helps() []ItemRender {
 	list := []ItemRender{
-		StringRender("菜单项: [Modify] 修改选择的项(高亮)，回车后，输入框中的内容会被设置，修改后，再次回车确认修改"),
-		StringRender("菜单项: [Delete] 将选择的项(高亮)从码表中删除，通过上下键选择"),
-		StringRender("菜单项: [Add]    将输入的内容添加到码表中，上下方向键要添加到的文件"),
-		StringRender("Enter:  显示菜单"),
+		StringRender("Ctrl+S:     手动同步，如果没有启用自动同步，"),
+		StringRender("            可通过此按键手动将变更同步至文件，并部署Rime"),
 		StringRender("Ctrl+Right: 修改权重，将当前项的权重加一"),
 		StringRender("Ctrl+Left:  修改权重，将当前项的权重减一"),
 		StringRender("Ctrl+Down:  修改权重，将当前项的权重增加到下一项之前"),
 		StringRender("Ctrl+Up:    修改权重，将当前项的权重降低到上一项之后"),
+		StringRender("Enter:      显示菜单"),
+		StringRender("菜单项: [A添加] 将输入的内容添加到码表中，"),
+		StringRender("                上下方向键选择要添加到的文件"),
+		StringRender("菜单项: [M修改] 修改选择的项(高亮)，"),
+		StringRender("                回车后，输入框中的内容会被设置，"),
+		StringRender("                修改后，再次回车确认修改"),
+		StringRender("菜单项: [D删除] 将选择的项(高亮)从码表中删除，通过上下键选择"),
 	}
+	slices.Reverse(list)
 	return list
 }
 
@@ -166,6 +180,19 @@ func (m *Model) CurrFile() (ItemRender, error) {
 	return files[m.lm.fileIndex], nil
 }
 
+func (m *Model) CurrItemFile() string {
+	currItem, err := m.CurrItem()
+	if err != nil {
+		return ""
+	}
+	for _, file := range m.lm.Files() {
+		if file.Id() == currItem.Id() {
+			return filepath.Base(file.String())
+		}
+	}
+	return ""
+}
+
 func (m *Model) CurrMenu() *Menu {
 	menus := m.menuFetcher(m.Modifying)
 	if m.MenuIndex < len(menus) {
@@ -229,10 +256,20 @@ func (m *Model) menuCtl(key string) {
 		}
 	default:
 		if len(key) == 1 && len(menus) > 0 {
-			for i, menu := range menus {
-				if strings.ToLower(menu.Name[:1]) == key {
-					m.MenuIndex = i
-					break
+			num, err := strconv.Atoi(key)
+			// select menu by numpad
+			if err == nil && num > 0 && num < 10 {
+				index := num - 1
+				if index < len(menus) {
+					m.MenuIndex = index
+				}
+			} else {
+				// select menu by letter
+				for i, menu := range menus {
+					if strings.ToLower(menu.Name[:1]) == key {
+						m.MenuIndex = i
+						break
+					}
 				}
 			}
 		}
@@ -256,7 +293,7 @@ func (m *Model) View() string {
 	if m.lm.ShowingHelp {
 		list = m.lm.Helps()
 		currIndex = 0
-	} else if m.ShowMenu && m.CurrMenu().Name == "Add" {
+	} else if m.ShowMenu && m.CurrMenu().Name == "A添加" {
 		list = m.lm.Files()
 		currIndex = m.lm.fileIndex
 	}
@@ -282,8 +319,8 @@ func (m *Model) View() string {
 		}
 	}
 	// footer
-	sb.WriteString(fmt.Sprintf("Total: %d\n", le))
-	sb.WriteString("Press[Enter:Menu][Ctrl+X:Clear Input][Ctrl+C|ESC:Quit][Ctrl+H:Show Help]\n")
+	sb.WriteString(fmt.Sprintf("Total: %d; %s\n", le, m.CurrItemFile()))
+	sb.WriteString("Press[Enter:操作][Ctrl+X:清空输入][Ctrl+S:同步][ESC:退出][Ctrl+H:帮助]\n")
 	if m.Modifying {
 		line = strings.Replace(line, "---------", "Modifying", 1)
 	}

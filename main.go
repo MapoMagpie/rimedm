@@ -4,9 +4,8 @@ import (
 	"log"
 	"path/filepath"
 
-	core "github.com/MapoMagpie/rimedm/core"
-	tea "github.com/charmbracelet/bubbletea"
-
+	"github.com/MapoMagpie/rimedm/core"
+	"github.com/charmbracelet/bubbletea"
 	// "net/http"
 	// _ "net/http/pprof"
 )
