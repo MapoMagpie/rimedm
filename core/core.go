@@ -74,7 +74,8 @@ func Start(opts *Options) {
 			}
 		}
 		fe := file.(*dict.FileEntries)
-		dc.Add(dict.NewEntryAdd(data.ToStringWithColumns(&fe.Columns), fe.ID, data))
+		data.ResetColumns(&fe.Columns)
+		dc.Add(dict.NewEntryAdd(data.ToString(), fe.ID, data))
 		log.Printf("add item: %s\n", pair)
 		m.Inputs = strings.Split(data.Code, "")
 		m.InputCursor = len(m.Inputs)

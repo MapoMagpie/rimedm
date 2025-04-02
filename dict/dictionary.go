@@ -303,6 +303,10 @@ func (d *Data) ToString() string {
 	return d.ToStringWithColumns(d.cols)
 }
 
+func (d *Data) ResetColumns(cols *[]Column) {
+	d.cols = cols
+}
+
 func (d *Data) ToStringWithColumns(cols *[]Column) string {
 	sb := strings.Builder{}
 	for _, col := range *cols {
