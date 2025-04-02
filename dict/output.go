@@ -1,6 +1,7 @@
 package dict
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"sort"
@@ -49,15 +50,15 @@ func output(fes []*FileEntries) (changed bool) {
 	return changed
 }
 
-func tryFatalf(err error, format string, args ...any) {
+func tryPanic(err error, format string, args ...any) {
 	if err != nil {
-		log.Fatalf(format, args...)
+		panic(fmt.Sprintf(format, args...))
 	}
 }
 
 func outputFile(rawBs *[]byte, path string, entries []*Entry) (changed bool) {
 	file, err := os.OpenFile(path, os.O_RDWR, 0666)
-	tryFatalf(err, "open File failed, Err:%v", err)
+	tryPanic(err, "open File failed, Err:%v", err)
 	defer func() { _ = file.Close() }()
 	bs := *rawBs
 	willAddEntries := make([]*Entry, 0)
@@ -110,8 +111,8 @@ func outputFile(rawBs *[]byte, path string, entries []*Entry) (changed bool) {
 	}
 	*rawBs = bs
 	l, err := file.Write(bs)
-	tryFatalf(err, "write File failed, Err:%v", err)
+	tryPanic(err, "write File failed, Err:%v", err)
 	err = file.Truncate(int64(l))
-	tryFatalf(err, "truncate File failed, Err:%v", err)
+	tryPanic(err, "truncate File failed, Err:%v", err)
 	return
 }

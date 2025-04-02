@@ -104,7 +104,7 @@ func loadFromFile(path string, ch chan<- *FileEntries, wg *sync.WaitGroup) {
 	if exist {
 		raw, err := io.ReadAll(head)
 		if err != nil {
-			log.Fatal("cant readAll bytes from head buffer")
+			panic("cant readAll bytes from head buffer")
 		}
 		seek = size
 		config, _ := parseYAML(raw)
@@ -217,9 +217,6 @@ type YAML map[string]any
 func parseYAML(raw []byte) (YAML, error) {
 	config := make(YAML)
 	err := yaml.Unmarshal(raw, &config)
-	// if err != nil {
-	// 	log.Fatalf("parse [%s] yaml error: %s", path, err)
-	// }
 	return config, err
 }
 
@@ -230,7 +227,7 @@ func parseExtendPaths(path string, config *YAML) []string {
 		pathFixed := filepath.Dir(path) + string(os.PathSeparator)
 		typeOf := reflect.TypeOf(importTables)
 		if typeOf.Kind() == reflect.Slice {
-			for _, extendDict := range importTables.([]interface{}) {
+			for _, extendDict := range importTables.([]any) {
 				extends = append(extends, fmt.Sprintf("%s%s.dict.yaml", pathFixed, extendDict))
 			}
 		}

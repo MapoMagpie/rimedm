@@ -67,7 +67,7 @@ func ParseOptions() (Options, string) {
 	}
 
 	if len(opts.DictPaths) == 0 {
-		log.Fatalf("未指定词典文件，请检查配置文件[%s]或通过 -d 指定词典文件", configPath)
+		panic(fmt.Sprintf("未指定词典文件，请检查配置文件[%s]或通过 -d 指定词典文件\n", configPath))
 	}
 
 	for i := range opts.DictPaths {
@@ -84,22 +84,22 @@ func initConfigFile(filePath string) {
 		if os.IsNotExist(err) {
 			err = os.MkdirAll(dirPath, os.ModePerm)
 			if err != nil {
-				log.Fatalf("mkdir [%s] err : %s", dirPath, err)
+				panic(fmt.Sprintf("mkdir [%s] err : %s", dirPath, err))
 			}
 		} else {
-			log.Fatalf("open [%s] err : %s", dirPath, err)
+			panic(fmt.Sprintf("open [%s] err : %s", dirPath, err))
 		}
 	}
 	file, err := os.Create(filePath)
 	if err != nil {
-		log.Fatalf("create [%s] err : %s", filePath, err)
+		panic(fmt.Sprintf("create [%s] err : %s", filePath, err))
 	}
 	defer func() {
 		_ = file.Close()
 	}()
 	_, err = file.WriteString(initConfigTemplate())
 	if err != nil {
-		log.Fatalf("write [%s] err : %s", filePath, err)
+		panic(fmt.Sprintf("write [%s] err : %s", filePath, err))
 	}
 }
 
@@ -213,10 +213,10 @@ func parseFromFile(path string) Options {
 			initConfigFile(path)
 			file, err = os.Open(path)
 			if err != nil {
-				log.Fatalf("init config file [%s] err : %s", path, err)
+				panic(fmt.Sprintf("init config file [%s] err : %s", path, err))
 			}
 		} else {
-			log.Fatalf("open [%s] err : %s", path, err)
+			panic(fmt.Sprintf("open [%s] err : %s", path, err))
 		}
 	}
 	defer func() {
@@ -224,14 +224,14 @@ func parseFromFile(path string) Options {
 	}()
 	stat, err := file.Stat()
 	if err != nil {
-		log.Fatalf("file stat [%s] err : %s", path, err)
+		panic(fmt.Sprintf("file stat [%s] err : %s", path, err))
 	}
 	bs := make([]byte, stat.Size())
 	_, _ = file.Read(bs)
 	var opts Options
 	err = yaml.Unmarshal(bs, &opts)
 	if err != nil {
-		log.Fatalf("parse config [%s] err : %s", path, err)
+		panic(fmt.Sprintf("parse config [%s] err : %s", path, err))
 	}
 	return opts
 }
