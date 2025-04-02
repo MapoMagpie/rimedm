@@ -50,33 +50,31 @@ func Start(opts *Options) {
 			return tui.ExitMenuCmd
 		}
 		file, err := m.CurrFile()
+		fe := file.(*dict.FileEntries)
 		if err != nil {
-			log.Fatalf("add to dict error: %v", err)
-			return
+			panic(fmt.Sprintf("add to dict error: %v", err))
 		}
 		raw := strings.TrimSpace(strings.Join(m.Inputs, ""))
 		if raw == "" {
 			return
 		}
-		pair, cols := dict.ParseInput(raw)
+		pair, cols := dict.ParseInput(raw, slices.Index(fe.Columns, dict.COLUMN_STEM) != -1)
 		if len(pair) == 0 {
 			return tui.ExitMenuCmd
 		}
 		data, _ := dict.ParseData(pair, &cols)
+		data.ResetColumns(&fe.Columns)
 		curr, err := listManager.Curr()
-		if err == nil {
-			// 自动修改权重
+		if err == nil { // 自动修改权重
 			currEntry := curr.(*dict.MatchResult).Entry
 			currEntryData := currEntry.Data()
 			if currEntryData.Code == data.Code && data.Weight == 0 { // 新加项的码如果和当前项的码相同，则自动修改新加项的权重
 				data.Weight = currEntryData.Weight + 1
-				// log.Println("curr entry: ", currEntry, ", new Entry pair: ", pairs)
 			}
 		}
-		fe := file.(*dict.FileEntries)
-		data.ResetColumns(&fe.Columns)
-		dc.Add(dict.NewEntryAdd(data.ToString(), fe.ID, data))
-		log.Printf("add item: %s\n", pair)
+		entryRaw := data.ToString()
+		dc.Add(dict.NewEntryAdd(entryRaw, fe.ID, data))
+		log.Printf("add item: %s\n", entryRaw)
 		m.Inputs = strings.Split(data.Code, "")
 		m.InputCursor = len(m.Inputs)
 		dc.ResetMatcher()
@@ -125,21 +123,27 @@ func Start(opts *Options) {
 		raw := strings.Join(m.Inputs, "")
 		switch item := modifyingItem.(type) {
 		case *dict.MatchResult:
-			pair, cols := dict.ParseInput(raw)
+			feIndex := slices.IndexFunc(fes, func(fe *dict.FileEntries) bool {
+				return fe.ID == item.Entry.FID
+			})
+			if feIndex == -1 {
+				panic("modify item error: this item does not belong to any file")
+			}
+			fe := fes[feIndex]
+			pair, cols := dict.ParseInput(raw, slices.Index(fe.Columns, dict.COLUMN_STEM) != -1)
 			if len(pair) > 1 {
 				data, _ := dict.ParseData(pair, &cols)
-				feIndex := slices.IndexFunc(fes, func(fe *dict.FileEntries) bool {
-					return fe.ID == item.Entry.FID
-				})
+				data.ResetColumns(&fe.Columns)
+				entryRaw := data.ToString()
+				log.Printf("modify confirm item: %s\n", entryRaw)
+				item.Entry.ReRaw(entryRaw)
 				if feIndex > -1 {
 					item.Entry.ReRaw(data.ToStringWithColumns(&fes[feIndex].Columns))
-					log.Printf("modify confirm item: %s\n", item)
 				}
 				m.Inputs = strings.Split(data.Code, "")
 				m.InputCursor = len(m.Inputs)
 			}
 			dc.ResetMatcher()
-			listManager.ReSort()
 			FlushAndSync(opts, dc, opts.SyncOnChange)
 		}
 		return tui.ExitMenuCmd
@@ -301,7 +305,7 @@ func Start(opts *Options) {
 				useColumn := dict.COLUMN_CODE
 				if len(raw) > 0 {
 					// if the input has code(码) then change the rs(search term) to code
-					pairs, cols := dict.ParseInput(raw)
+					pairs, cols := dict.ParseInput(raw, false)
 					if len(pairs) > 0 {
 						codeIndex := slices.Index(cols, dict.COLUMN_CODE)
 						if codeIndex != -1 {

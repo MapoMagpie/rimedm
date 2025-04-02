@@ -226,17 +226,17 @@ columns:
 				fe := LoadItems(filename)[0]
 
 				// new entry then just delete
-				ne0 := NewEntryAdd("萌子	lohi	1", 0, Data{})
+				ne0 := NewEntryAdd("萌子	lohi	1", 0, Data{cols: &fe.Columns})
 				fe.Entries = append(fe.Entries, ne0)
 				// outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
 				ne0.Delete()
 
-				ne1 := NewEntryAdd("萌子	lohi	1", 0, Data{})
+				ne1 := NewEntryAdd("萌子	lohi	1", 0, Data{cols: &fe.Columns})
 				fe.Entries = append(fe.Entries, ne1)
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
 				ne1.Delete()
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
-				ne2 := NewEntryAdd("伊藤	jblv	1", 0, Data{})
+				ne2 := NewEntryAdd("伊藤	jblv	1", 0, Data{cols: &fe.Columns})
 				fe.Entries = append(fe.Entries, ne2)
 				outputFile(&fe.RawBs, fe.FilePath, fe.Entries)
 				ne2.ReRaw("伊藤	jblv	10")

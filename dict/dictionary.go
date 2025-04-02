@@ -3,6 +3,7 @@ package dict
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"slices"
 	"strconv"
@@ -124,6 +125,10 @@ func (e *Entry) Data() *Data {
 
 func (e *Entry) ReRaw(raw string) {
 	e.raw = raw
+	if e.data.cols == nil {
+		panic(fmt.Sprintf("ReRaw: [%s], but data have no columns", raw))
+	}
+	e.data = fastParseData(raw, e.data.cols)
 	if e.modType != ADD {
 		e.modType = MODIFY
 	}
@@ -160,13 +165,15 @@ func (e *Entry) Saved() {
 // Parse input string to a pair of strings
 // 支持乱序输入，如 "你好 nau 1" 或 "nau 1 你好"
 // 解析规则：将原始内容通过空白字符分割成单元，依次判断每个单元是否是汉字、纯数字、ascii，
-// 汉字将作为text，纯数字作为weight，其他ascii根据顺序，第一个为code，其余皆为stem(造字码)
-func ParseInput(raw string) ([]string, []Column) {
+// 汉字将作为text，纯数字作为weight，其他ascii根据顺序，前面的将用空格连结合并为code，最后的为stem
+// stem(造字码，用于造词时代替code，比如 的 编码为 u，造字为 un，当造词 我的 时，会用un代替u，最终用tuun造词 我的)
+func ParseInput(raw string, hasStem bool) ([]string, []Column) {
 	pair := make([]string, 0)
 	cols := make([]Column, 0)
 	// split by '\t' or ' '
 	splits := strings.Fields(raw)
 	textIndex := -1
+	codeIndex := -1
 	for i := range splits {
 		split := strings.TrimSpace(splits[i])
 		if len(split) == 0 {
@@ -178,18 +185,12 @@ func ParseInput(raw string) ([]string, []Column) {
 			continue
 		}
 		if util.IsAscii(split) {
-			codeIndex := slices.Index(cols, COLUMN_CODE)
-			stemIndex := slices.Index(cols, COLUMN_STEM)
+			codeIndex = slices.Index(cols, COLUMN_CODE)
 			if codeIndex == -1 {
 				cols = append(cols, COLUMN_CODE)
 				pair = append(pair, split)
 			} else {
-				if stemIndex == -1 {
-					cols = append(cols, COLUMN_STEM)
-					pair = append(pair, split)
-				} else {
-					pair[stemIndex] = pair[stemIndex] + " " + split
-				}
+				pair[codeIndex] = pair[codeIndex] + " " + split
 			}
 			continue
 		}
@@ -203,6 +204,17 @@ func ParseInput(raw string) ([]string, []Column) {
 			pair[textIndex] = pair[textIndex] + " " + split
 		}
 	}
+
+	if hasStem && codeIndex != -1 {
+		code := pair[codeIndex]
+		split := strings.Split(code, " ")
+		if len(split) > 1 {
+			cols = append(cols, COLUMN_STEM)
+			pair = append(pair, split[len(split)-1])
+		}
+		pair[codeIndex] = strings.Join(split[:len(split)-1], " ")
+	}
+
 	if textIndex == -1 { // 仍旧没有汉字，将code作为text, stem作为text
 		codeIndex := slices.Index(cols, COLUMN_CODE)
 		stemIndex := slices.Index(cols, COLUMN_STEM)
@@ -212,7 +224,6 @@ func ParseInput(raw string) ([]string, []Column) {
 				cols[stemIndex] = COLUMN_CODE
 			}
 		}
-
 	}
 	return pair, cols
 }
