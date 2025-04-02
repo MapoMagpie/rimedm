@@ -221,7 +221,7 @@ func (m *Model) inputCtl(key string) {
 	switch strings.ToLower(key) {
 	case "backspace":
 		if m.InputCursor > 0 {
-			m.Inputs = append(m.Inputs[:m.InputCursor-1], m.Inputs[m.InputCursor:]...)
+			m.Inputs = slices.Delete(m.Inputs, m.InputCursor-1, m.InputCursor)
 			m.InputCursor--
 			m.FreshList()
 		}

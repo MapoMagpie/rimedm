@@ -99,10 +99,7 @@ func (m *CacheMatcher) Search(key string, useColumn Column, searchVersion int, l
 	listLen := len(list)
 	chunkSize := 50000 // chunkSize = listLen means no async search
 	for c := 0; c < listLen; c += chunkSize {
-		end := c + chunkSize
-		if end > listLen {
-			end = listLen
-		}
+		end := min(c+chunkSize, listLen)
 		chunk := list[c:end]
 		source := &ChunkSource{chunk, getTarget}
 		matches := fuzzy.FindFromNoSort(key, source)

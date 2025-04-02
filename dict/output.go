@@ -49,7 +49,7 @@ func output(fes []*FileEntries) (changed bool) {
 	return changed
 }
 
-func tryFatalf(err error, format string, args ...interface{}) {
+func tryFatalf(err error, format string, args ...any) {
 	if err != nil {
 		log.Fatalf(format, args...)
 	}
@@ -58,7 +58,7 @@ func tryFatalf(err error, format string, args ...interface{}) {
 func outputFile(rawBs *[]byte, path string, entries []*Entry) (changed bool) {
 	file, err := os.OpenFile(path, os.O_RDWR, 0666)
 	tryFatalf(err, "open File failed, Err:%v", err)
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	bs := *rawBs
 	willAddEntries := make([]*Entry, 0)
 	seekFixed := int64(0)
@@ -91,7 +91,7 @@ func outputFile(rawBs *[]byte, path string, entries []*Entry) (changed bool) {
 	if !changed {
 		return
 	}
-	var seek int64 = int64(len(bs))
+	seek := int64(len(bs))
 	// append new entry to file
 	if len(willAddEntries) > 0 {
 		if bs[len(bs)-1] != '\n' {

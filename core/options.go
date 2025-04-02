@@ -70,7 +70,7 @@ func ParseOptions() (Options, string) {
 		log.Fatalf("未指定词典文件，请检查配置文件[%s]或通过 -d 指定词典文件", configPath)
 	}
 
-	for i := 0; i < len(opts.DictPaths); i++ {
+	for i := range opts.DictPaths {
 		opts.DictPaths[i] = fixPath(opts.DictPaths[i])
 	}
 	opts.UserPath = fixPath(opts.UserPath)

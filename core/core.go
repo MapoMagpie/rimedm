@@ -139,6 +139,7 @@ func Start(opts *Options) {
 				m.InputCursor = len(m.Inputs)
 			}
 			dc.ResetMatcher()
+			listManager.ReSort()
 			FlushAndSync(opts, dc, opts.SyncOnChange)
 		}
 		return tui.ExitMenuCmd
@@ -200,7 +201,7 @@ func Start(opts *Options) {
 				// log.Println("list: ", list)
 				var prev *dict.Entry = nil
 				var next *dict.Entry = nil
-				for i := 0; i < len(list); i++ {
+				for i := range list {
 					entry := list[i].(*dict.MatchResult).Entry
 					if entry == currEntry {
 						if i+1 < len(list) {

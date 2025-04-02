@@ -37,7 +37,9 @@ func Test_LoadItems_xhup(t *testing.T) {
 单元	djyr
 反思	fjsi`
 	filename := createFile("./flypy_user.txt", content)
-	defer os.RemoveAll("./flypy_user.txt")
+	defer func() {
+		_ = os.RemoveAll("./flypy_user.txt")
+	}()
 	cols := []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT}
 	tests := []struct {
 		name     string
@@ -85,7 +87,9 @@ func Test_LoadItems_xhup(t *testing.T) {
 
 func Test_LoadItems(t *testing.T) {
 	filenames := mockFile()
-	defer os.RemoveAll("./tmp")
+	defer func() {
+		_ = os.RemoveAll("./tmp")
+	}()
 	type args struct {
 		path string
 	}
@@ -318,7 +322,9 @@ func createFile(name string, content string) string {
 		fmt.Println("create temp file error, ", err)
 		panic(err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 	_, _ = file.WriteString(content)
 	return file.Name()
 }

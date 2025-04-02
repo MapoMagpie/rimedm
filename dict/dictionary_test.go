@@ -173,9 +173,9 @@ func Test_Dictionary_Search(t *testing.T) {
 					rawLen := len(entries)
 					wantLen := len(want)
 					info := ""
-					for i := 0; i < int(math.Max(float64(rawLen), float64(wantLen))); i++ {
-						var raw string = "EMPTY"
-						var wan string = "EMPTY"
+					for i := range int(math.Max(float64(rawLen), float64(wantLen))) {
+						raw := "EMPTY"
+						wan := "EMPTY"
 						if i < rawLen {
 							raw = entries[i].raw
 						}

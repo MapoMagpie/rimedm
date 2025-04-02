@@ -167,7 +167,7 @@ func ParseInput(raw string) ([]string, []Column) {
 	// split by '\t' or ' '
 	splits := strings.Fields(raw)
 	textIndex := -1
-	for i := 0; i < len(splits); i++ {
+	for i := range splits {
 		split := strings.TrimSpace(splits[i])
 		if len(split) == 0 {
 			continue
@@ -223,7 +223,7 @@ func ParseData(pair []string, columns *[]Column) (Data, error) {
 	}
 	var data Data
 	data.cols = columns
-	for i := 0; i < len(pair); i++ {
+	for i := range pair {
 		term := pair[i]
 		col := (*columns)[i]
 		switch col {

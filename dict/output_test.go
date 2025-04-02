@@ -7,7 +7,7 @@ import (
 
 func Test_outputFile(t *testing.T) {
 	_ = os.MkdirAll("./tmp", os.ModePerm)
-	defer os.RemoveAll("./tmp")
+	defer func() { _ = os.RemoveAll("./tmp") }()
 	content1 := `
 ---
 name: xkjd6.whatever

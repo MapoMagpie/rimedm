@@ -1,13 +1,13 @@
 module github.com/MapoMagpie/rimedm
 
-go 1.21.6
+go 1.24.1
 
 require (
 	github.com/charmbracelet/bubbletea v0.25.0
 	github.com/goccy/go-yaml v1.11.3
+	github.com/mattn/go-runewidth v0.0.15
 	github.com/sahilm/fuzzy v0.1.1
 	golang.org/x/term v0.16.0
-	github.com/mattn/go-runewidth v0.0.15
 )
 
 require (
