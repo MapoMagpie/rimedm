@@ -149,19 +149,19 @@ func Test_Dictionary_Search(t *testing.T) {
 		t.Run(tt.name, func(_ *testing.T) {
 			dict := NewDictionary(tt.args.fes, &CacheMatcher{})
 			ctx := context.Background()
-			ch := make(chan []*MatchResult)
+			ch := make(chan MatchResultChunk)
 			fmt.Println("searching for", string(tt.args.key))
 			go func() {
-				dict.Search(tt.args.key, tt.args.useColumn, ch, ctx)
+				dict.Search(tt.args.key, tt.args.useColumn, 0, ch, ctx)
 				close(ch)
 			}()
 			for ret := range ch {
-				sort.Slice(ret, func(i, j int) bool {
-					return ret[i].score > ret[j].score
+				sort.Slice(ret.Result, func(i, j int) bool {
+					return ret.Result[i].score > ret.Result[j].score
 				})
 				fmt.Println("ret", ret)
 				entries := make([]Entry, 0)
-				for _, r := range ret {
+				for _, r := range ret.Result {
 					fmt.Printf("ret: text: %s\tscore:%d\n", r.Entry.raw, r.score)
 					entries = append(entries, *r.Entry)
 				}

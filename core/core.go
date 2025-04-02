@@ -284,13 +284,13 @@ func Start(opts *Options) {
 	// 输入处理 搜索
 	go func() {
 		var cancelFunc context.CancelFunc
-		resultChan := make(chan []*dict.MatchResult)
+		resultChan := make(chan dict.MatchResultChunk)
 		timer := time.NewTicker(time.Millisecond * 100) // debounce
 		hasAppend := false
+		searchVersion := 0
 		for {
 			select {
 			case raw := <-searchChan: // 等待搜索term
-				listManager.NewList()
 				ctx, cancel := context.WithCancel(context.Background())
 				if cancelFunc != nil {
 					cancelFunc()
@@ -318,13 +318,15 @@ func Start(opts *Options) {
 						}
 					}
 				}
-				go dc.Search(rs, useColumn, resultChan, ctx)
+				searchVersion++
+				listManager.NewList(searchVersion)
+				go dc.Search(rs, useColumn, searchVersion, resultChan, ctx)
 			case ret := <-resultChan: // 等待搜索结果
-				list := make([]tui.ItemRender, len(ret))
-				for i, entry := range ret {
+				list := make([]tui.ItemRender, len(ret.Result))
+				for i, entry := range ret.Result {
 					list[i] = entry
 				}
-				listManager.AppendList(list)
+				listManager.AppendList(list, ret.Version)
 				// log.Println("list manager append list: ", len(list))
 				hasAppend = true
 			case <-timer.C: // debounce, if appended then flush

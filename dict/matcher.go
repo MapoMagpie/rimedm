@@ -11,6 +11,11 @@ type MatchResult struct {
 	score int
 }
 
+type MatchResultChunk struct {
+	Result  []*MatchResult
+	Version int
+}
+
 func (m *MatchResult) Id() int {
 	return int(m.Entry.FID)
 }
@@ -30,7 +35,7 @@ func (m *MatchResult) Cmp(other any) bool {
 }
 
 type Matcher interface {
-	Search(key string, useColumn Column, list []*Entry, resultChan chan<- []*MatchResult, ctx context.Context)
+	Search(key string, useColumn Column, searchVersion int, list []*Entry, resultChan chan<- MatchResultChunk, ctx context.Context)
 	Reset()
 }
 
@@ -44,7 +49,7 @@ func (m *CacheMatcher) Reset() {
 
 // var slab = util.MakeSlab(200*1024, 4096)
 
-func (m *CacheMatcher) Search(key string, useColumn Column, list []*Entry, resultChan chan<- []*MatchResult, ctx context.Context) {
+func (m *CacheMatcher) Search(key string, useColumn Column, searchVersion int, list []*Entry, resultChan chan<- MatchResultChunk, ctx context.Context) {
 	var done bool
 	go func() {
 		<-ctx.Done()
@@ -63,7 +68,7 @@ func (m *CacheMatcher) Search(key string, useColumn Column, list []*Entry, resul
 			return
 		}
 		if cache != nil && cachedKey == string(key) {
-			resultChan <- cache
+			resultChan <- MatchResultChunk{Result: cache, Version: searchVersion}
 			return
 		}
 	}
@@ -112,7 +117,7 @@ func (m *CacheMatcher) Search(key string, useColumn Column, list []*Entry, resul
 			ret = append(ret, &MatchResult{chunk[ma.Index], ma.Score})
 		}
 		if len(ret) > 0 {
-			resultChan <- ret
+			resultChan <- MatchResultChunk{Result: ret, Version: searchVersion}
 			matched = append(matched, ret...)
 		}
 	}

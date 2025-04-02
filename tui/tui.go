@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/mattn/go-runewidth"
 	"golang.org/x/term"
 )
 
@@ -58,8 +59,16 @@ type ListManager struct {
 	ShowingHelp bool
 	currIndex   int
 	fileIndex   int
-	setVer      int
-	getVer      int
+	version     int
+	noSort      bool
+}
+
+func (l *ListManager) ReSort() {
+	l.noSort = false
+}
+
+func (l *ListManager) SetSearchVersion(version int) {
+	l.version = version
 }
 
 func NewListManager(searchChan chan<- string) *ListManager {
@@ -75,11 +84,11 @@ func (l *ListManager) List() []ItemRender {
 	} else if l.currIndex > le-1 {
 		l.currIndex = le - 1
 	}
-	if l.getVer != l.setVer {
+	if !l.noSort {
 		sort.Slice(list, func(i, j int) bool {
 			return list[i].Cmp(list[j])
 		})
-		l.getVer = l.setVer
+		l.noSort = true
 	}
 	return list
 }
@@ -117,7 +126,8 @@ func (l *ListManager) Curr() (ItemRender, error) {
 	}
 }
 
-func (l *ListManager) NewList() {
+func (l *ListManager) NewList(version int) {
+	l.version = version
 	l.list = make([]ItemRender, 0)
 }
 
@@ -127,17 +137,15 @@ func (l *ListManager) newSearch(inputs []string) {
 	// log.Printf("send search key finshed")
 }
 
-func (l *ListManager) AppendList(rs []ItemRender) {
-	l.setVer++
-	l.list = append(l.list, rs...)
+func (l *ListManager) AppendList(rs []ItemRender, version int) {
+	if l.version == version {
+		l.list = append(l.list, rs...)
+		l.noSort = false
+	}
 }
 
 func (l *ListManager) SetFiles(files []ItemRender) {
 	l.files = files
-}
-
-func (l *ListManager) ReSort() {
-	l.getVer = l.setVer + 1
 }
 
 func (l *ListManager) SetIndex(index int) {
@@ -312,10 +320,12 @@ func (m *Model) View() string {
 			top, bot = currIndex, currIndex-renderCnt+1
 		}
 		for i := top; i >= bot; i-- {
+			line := list[i].String()
+			line = truncateString(line, m.wx-16)
 			if i == currIndex && !m.lm.ShowingHelp {
-				sb.WriteString(fmt.Sprintf("\x1b[31m>\x1b[0m \x1b[1;4;35m\x1b[47m%3d: %s\x1b[0m\n", i+1, list[i].String()))
+				sb.WriteString(fmt.Sprintf("\x1b[31m>\x1b[0m \x1b[1;4;35m\x1b[47m%3d: %s\x1b[0m\n", i+1, line))
 			} else {
-				sb.WriteString(fmt.Sprintf("> %3d: %s\n", i+1, list[i].String()))
+				sb.WriteString(fmt.Sprintf("> %3d: %s\n", i+1, line))
 			}
 		}
 	}
@@ -380,4 +390,17 @@ func NewModel(lm *ListManager, menuFetcher func(bool) []*Menu, events ...*Event)
 	}
 	model := &Model{lm: lm, wx: wx, hx: hx, menuFetcher: menuFetcher, eventManager: NewEventManager(events...)}
 	return model
+}
+func truncateString(s string, wx int) string {
+	width := 0
+	end := len(s)
+	for i, r := range s {
+		w := runewidth.RuneWidth(r) // 获取字符宽度
+		if width+w > wx {
+			end = i
+			break
+		}
+		width += w
+	}
+	return s[:end]
 }

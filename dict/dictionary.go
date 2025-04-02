@@ -37,7 +37,7 @@ func (d *Dictionary) Entries() []*Entry {
 	return d.entries
 }
 
-func (d *Dictionary) Search(key string, useColumn Column, resultChan chan<- []*MatchResult, ctx context.Context) {
+func (d *Dictionary) Search(key string, useColumn Column, searchVersion int, resultChan chan<- MatchResultChunk, ctx context.Context) {
 	// log.Println("search key: ", string(key))
 	if len(key) == 0 {
 		done := false
@@ -58,9 +58,9 @@ func (d *Dictionary) Search(key string, useColumn Column, resultChan chan<- []*M
 			}
 			ret[i-deleteCount] = &MatchResult{Entry: entry}
 		}
-		resultChan <- ret[0 : len(ret)-deleteCount]
+		resultChan <- MatchResultChunk{Result: ret[0 : len(ret)-deleteCount], Version: searchVersion}
 	} else {
-		d.matcher.Search(key, useColumn, d.Entries(), resultChan, ctx)
+		d.matcher.Search(key, useColumn, searchVersion, d.Entries(), resultChan, ctx)
 	}
 }
 
