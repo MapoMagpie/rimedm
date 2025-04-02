@@ -3,8 +3,55 @@ package dict
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"testing"
 )
+
+func Test_LoadItems_xhup(t *testing.T) {
+	cols := []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT}
+	tests := []struct {
+		name     string
+		filename string
+		want     []Data
+	}{
+		{
+			name: "xhup", filename: "../rime/xhup/flypy_user.txt",
+			want: []Data{
+				{Text: "即使", Code: "jiui", cols: &cols},
+				{Text: "回忆", Code: "hvyi", cols: &cols},
+				{Text: "华为", Code: "hxww", cols: &cols},
+			},
+		}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(_ *testing.T) {
+			// start := time.Now()
+			fes := LoadItems(tt.filename)
+			// duration1 := time.Since(start)
+			// fmt.Println("======================================================")
+			// fmt.Println("fes >>", len(fes))
+			got := make([]Data, 0)
+			if len(fes) > 0 {
+				for _, fe := range fes {
+					for _, entry := range fe.Entries {
+						got = append(got, entry.data)
+					}
+				}
+			}
+			// fmt.Println("count >>", len(entries))
+			got = got[:3]
+			if !reflect.DeepEqual(got, tt.want) {
+				for _, d := range got {
+					t.Errorf("Load Item Count got  = %+v", d)
+				}
+				for _, d := range tt.want {
+					t.Errorf("Load Item Count want = %+v", d)
+				}
+			}
+			// fmt.Println("======================================================")
+			// fmt.Println("load duration >>", duration1)
+		})
+	}
+}
 
 func Test_LoadItems(t *testing.T) {
 	filenames := mockFile()

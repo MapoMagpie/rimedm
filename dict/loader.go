@@ -109,6 +109,8 @@ func loadFromFile(path string, ch chan<- *FileEntries, wg *sync.WaitGroup) {
 		config, _ := parseYAML(raw)
 		fe.Columns = parseColumnsOrDefault(&config)
 		loadExtendDict(path, &config, ch, wg)
+	} else {
+		fe.Columns = []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT}
 	}
 
 	// 函数：读取 码
