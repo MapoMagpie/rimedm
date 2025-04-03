@@ -2,7 +2,6 @@ package dict
 
 import (
 	"context"
-	"log"
 
 	"github.com/sahilm/fuzzy"
 )
