@@ -6,7 +6,6 @@ import (
 	"log"
 	"math"
 	"os"
-	"os/exec"
 	"slices"
 	"sort"
 	"strings"
@@ -363,11 +362,7 @@ func FlushAndSync(opts *Options, dc *dict.Dictionary, sync bool) {
 	}
 	if dc.Flush() && opts.RestartRimeCmd != "" {
 		// TODO: check RestartRimeCmd, if weasel updated, the program path may be changed
-		shell := os.Getenv("SHELL")
-		if len(shell) == 0 {
-			shell = "sh"
-		}
-		cmd := exec.Command(shell, "-c", opts.RestartRimeCmd)
+		cmd := mutil.Run(opts.RestartRimeCmd)
 		err := cmd.Run()
 		if err != nil {
 			panic(fmt.Errorf("exec restart rime cmd error:%v", err))
