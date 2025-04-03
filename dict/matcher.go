@@ -28,9 +28,9 @@ func (m *MatchResult) Cmp(other any) bool {
 	if o, ok := other.(*MatchResult); ok {
 		if m.score == o.score {
 			if m.Entry.data.Weight == o.Entry.data.Weight {
-				return m.Entry.data.Weight > o.Entry.data.Weight
-			} else {
 				return len(m.Entry.data.Code) < len(m.Entry.data.Code)
+			} else {
+				return m.Entry.data.Weight > o.Entry.data.Weight
 			}
 		}
 		return m.score > o.score
