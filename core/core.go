@@ -330,8 +330,8 @@ func Start(opts *Options) {
 				for i, entry := range ret.Result {
 					list[i] = entry
 				}
+				// log.Printf("search result: %d, version: %d", len(list), ret.Version)
 				listManager.AppendList(list, ret.Version)
-				// log.Println("list manager append list: ", len(list))
 				hasAppend = true
 			case <-timer.C: // debounce, if appended then flush
 				if hasAppend {

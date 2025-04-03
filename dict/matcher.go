@@ -2,6 +2,7 @@ package dict
 
 import (
 	"context"
+	"log"
 
 	"github.com/sahilm/fuzzy"
 )
@@ -69,9 +70,14 @@ func (m *CacheMatcher) Search(key string, useColumn Column, searchVersion int, l
 			}
 		}
 		if done {
+			// log.Println("search canceld: ", key)
 			return
 		}
+		// if cache != nil {
+		// 	log.Println("search hit cache key: ", cachedKey)
+		// }
 		if cache != nil && cachedKey == string(key) {
+			// log.Println("search directly use cache")
 			resultChan <- MatchResultChunk{Result: cache, Version: searchVersion}
 			return
 		}
@@ -79,6 +85,7 @@ func (m *CacheMatcher) Search(key string, useColumn Column, searchVersion int, l
 
 	if cache != nil {
 		list = make([]*Entry, len(cache))
+		// log.Println("search from cached: ", key)
 		for i, m := range cache {
 			list[i] = m.Entry
 		}
@@ -108,6 +115,8 @@ func (m *CacheMatcher) Search(key string, useColumn Column, searchVersion int, l
 		source := &ChunkSource{chunk, getTarget}
 		matches := fuzzy.FindFromNoSort(key, source)
 		if len(matches) == 0 {
+			// log.Println("search zero matches: ", key)
+			resultChan <- MatchResultChunk{Result: []*MatchResult{}, Version: searchVersion}
 			continue
 		}
 		ret := make([]*MatchResult, 0, len(matches))
@@ -123,10 +132,12 @@ func (m *CacheMatcher) Search(key string, useColumn Column, searchVersion int, l
 		}
 	}
 	// log.Printf("Cache Matcher Search: Key: %s, List Len: %d, Cached: %v, Matched: %d", string(key), listLen, cache != nil, len(matched))
-	if m.cache == nil {
-		m.cache = make(map[string][]*MatchResult)
+	if len(matched) > 0 {
+		if m.cache == nil {
+			m.cache = make(map[string][]*MatchResult)
+		}
+		m.cache[key] = matched
 	}
-	m.cache[string(key)] = matched
 }
 
 type ChunkSource struct {

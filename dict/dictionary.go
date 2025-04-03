@@ -39,7 +39,7 @@ func (d *Dictionary) Entries() []*Entry {
 }
 
 func (d *Dictionary) Search(key string, useColumn Column, searchVersion int, resultChan chan<- MatchResultChunk, ctx context.Context) {
-	// log.Println("search key: ", string(key))
+	// log.Printf("search key: %s, version: %d", string(key), searchVersion)
 	if len(key) == 0 {
 		done := false
 		go func() {
