@@ -16,12 +16,17 @@ func exportDict(path string, fes []*FileEntries) {
 	defer func() {
 		_ = file.Close()
 	}()
+	cols := []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT}
 	for _, fe := range fes {
 		if len(fe.Entries) == 0 {
 			continue
 		}
 		for _, entry := range fe.Entries {
-			_, err := file.WriteString(entry.Raw() + "\t")
+			_, err := file.WriteString(entry.data.ToStringWithColumns(&cols))
+			if err != nil {
+				panic(err)
+			}
+			_, err = file.WriteString("\n")
 			if err != nil {
 				panic(err)
 			}
