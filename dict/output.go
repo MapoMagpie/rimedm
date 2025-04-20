@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-func exportDict(path string, fes []*FileEntries) {
+func exportDict(path string, fes []*FileEntries, cols []Column) {
 	file, err := os.Create(path)
 	if err != nil {
 		panic(err)
@@ -16,11 +16,11 @@ func exportDict(path string, fes []*FileEntries) {
 	defer func() {
 		_ = file.Close()
 	}()
-	cols := []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT}
 	for _, fe := range fes {
 		if len(fe.Entries) == 0 {
 			continue
 		}
+		log.Println("导出词库中:", fe.FilePath)
 		for _, entry := range fe.Entries {
 			_, err := file.WriteString(entry.data.ToStringWithColumns(&cols))
 			if err != nil {

@@ -45,7 +45,7 @@ func LoadItems(paths ...string) (fes []*FileEntries) {
 	var wg sync.WaitGroup
 	for _, path := range paths {
 		wg.Add(1)
-		go loadFromFile(path, ch, &wg)
+		go loadFromFile(path, util.IDGen.NextID(), ch, &wg)
 	}
 	go func() {
 		wg.Wait()
@@ -72,9 +72,9 @@ var (
 	YAML_END   = "..."
 )
 
-func loadFromFile(path string, ch chan<- *FileEntries, wg *sync.WaitGroup) {
+func loadFromFile(path string, id uint8, ch chan<- *FileEntries, wg *sync.WaitGroup) {
 	defer wg.Done()
-	fe := &FileEntries{FilePath: path, Entries: make([]*Entry, 0), ID: util.IDGen.NextID()}
+	fe := &FileEntries{FilePath: path, Entries: make([]*Entry, 0), ID: id}
 	file, err := os.OpenFile(path, os.O_RDONLY, 0666)
 	if fe.Err = err; err != nil {
 		ch <- fe
@@ -206,9 +206,9 @@ func loadExtendDict(path string, config *YAML, ch chan<- *FileEntries, wg *sync.
 	paths := parseExtendPaths(path, config)
 	wg.Add(len(paths))
 	for _, extendPath := range paths {
-		go func(newPath string) {
-			loadFromFile(newPath, ch, wg)
-		}(extendPath)
+		go func(newPath string, id uint8) {
+			loadFromFile(newPath, id, ch, wg)
+		}(extendPath, util.IDGen.NextID())
 	}
 }
 

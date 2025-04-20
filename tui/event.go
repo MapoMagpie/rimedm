@@ -6,9 +6,8 @@ type EventManager struct {
 	keyMap map[string]*Event
 }
 
-func NewEventManager(events ...*Event) *EventManager {
+func NewEventManager() *EventManager {
 	e := &EventManager{keyMap: make(map[string]*Event)}
-	e.Add(events...)
 	return e
 }
 
@@ -32,22 +31,13 @@ type Event struct {
 var MoveEvent = &Event{
 	Keys: []string{"up", "ctrl+j", "down", "ctrl+k"},
 	Cb: func(key string, m *Model) (tea.Model, tea.Cmd) {
-		list := m.lm.List()
-		currIndex := &m.lm.currIndex
-		if m.ShowMenu && m.CurrMenu().Name == "A添加" {
-			list = m.lm.files
-			currIndex = &m.lm.fileIndex
-		}
 		switch key {
 		case "up", "ctrl+k":
-			if *currIndex < len(list)-1 {
-				*currIndex++
-			}
+			m.ListManager.StepIndex(+1)
 		case "down", "ctrl+j":
-			if *currIndex > 0 {
-				*currIndex--
-			}
+			m.ListManager.StepIndex(-1)
 		}
+		m.ClearMessage()
 		return m, nil
 	},
 }
@@ -57,6 +47,7 @@ var ClearInputEvent = &Event{
 	Cb: func(_ string, m *Model) (tea.Model, tea.Cmd) {
 		m.Inputs = []string{}
 		m.InputCursor = 0
+		m.ClearMessage()
 		m.FreshList()
 		return m, nil
 	},
@@ -65,16 +56,12 @@ var ClearInputEvent = &Event{
 var EnterEvent = &Event{
 	Keys: []string{"enter"},
 	Cb: func(_ string, m *Model) (tea.Model, tea.Cmd) {
-		if m.lm.ShowingHelp {
-			m.lm.ShowingHelp = false
-			return m, nil
-		}
-		if menus := m.menuFetcher(m.Modifying); m.ShowMenu && len(menus) > 0 {
-			if menu := menus[m.MenuIndex]; menu.Cb != nil {
+		if !m.MenusShowing {
+			m.ShowMenus()
+		} else if len(m.menus) > 0 {
+			if menu := m.menus[m.MenuIndex]; menu.Cb != nil {
 				return m, menu.Cb(m)
 			}
-		} else {
-			m.ShowMenu = true
 		}
 		return m, nil
 	},

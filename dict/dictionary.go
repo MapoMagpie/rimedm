@@ -96,8 +96,8 @@ func (d *Dictionary) Flush() (changed bool) {
 	return changed
 }
 
-func (d *Dictionary) ExportDict(path string) {
-	exportDict(path, d.fileEntries)
+func (d *Dictionary) ExportDict(path string, columns []Column) {
+	exportDict(path, d.fileEntries, columns)
 }
 
 type ModifyType int
