@@ -252,10 +252,14 @@ func Start(opts *Options) {
 		Keys: []string{"esc", "ctrl+c", "ctrl+d"},
 		Cb: func(key string, m *tui.Model) (tea.Model, tea.Cmd) {
 			if key == "esc" {
-				if m.MenusShowing || m.Modifying {
-					m.MenusShowing = false
-					m.Modifying = false
+				if m.Modifying || m.MenusShowing {
+					if m.Modifying {
+						m.Inputs = []string{}
+						m.InputCursor = 0
+						m.Modifying = false
+					}
 					m.ListManager.ListMode = tui.LIST_MODE_DICT
+					m.HideMenus()
 					return m, nil
 				}
 			}

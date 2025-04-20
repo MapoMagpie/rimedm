@@ -417,7 +417,8 @@ func (m *Model) View() string {
 	sb.WriteString(fmt.Sprintf("Total: %d; %s\n", le, m.MessageOr(m.CurrItemFile())))
 	sb.WriteString("Press[Enter:操作][Ctrl+X:清空输入][Ctrl+S:同步][ESC:退出][Ctrl+H:帮助]\n")
 	if m.Modifying {
-		line = strings.Replace(line, "---------", "Modifying", 1)
+		sb.WriteString("----修改中  按回车提交修改")
+		line = line[:max(len(line)-26, 1)]
 	}
 	sb.WriteString(line + "\n")
 
