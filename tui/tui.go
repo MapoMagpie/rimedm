@@ -186,6 +186,8 @@ func (l *ListManager) Helps() []ItemRender {
 func (l *ListManager) Curr() (ItemRender, error) {
 	if len(l.list) == 0 {
 		return nil, errors.New("empty list")
+	} else if l.currIndex >= len(l.list) {
+		return nil, errors.New("currIndex out list")
 	} else {
 		return l.list[l.currIndex], nil
 	}
