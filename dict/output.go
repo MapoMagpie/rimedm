@@ -8,6 +8,28 @@ import (
 	"sync"
 )
 
+func isExtendedCJK(text string) bool {
+	chars := []rune(text)
+	if len(chars) == 1 {
+		ch := chars[0]
+		return ((ch >= 0x3400 && ch <= 0x4DBF) || // CJK Unified Ideographs Extension A
+			(ch >= 0x20000 && ch <= 0x2A6DF) || // CJK Unified Ideographs Extension B
+			(ch >= 0x2A700 && ch <= 0x2B73F) || // CJK Unified Ideographs Extension C
+			(ch >= 0x2B740 && ch <= 0x2B81F) || // CJK Unified Ideographs Extension D
+			(ch >= 0x2B820 && ch <= 0x2CEAF) || // CJK Unified Ideographs Extension E
+			(ch >= 0x2CEB0 && ch <= 0x2EBEF) || // CJK Unified Ideographs Extension F
+			(ch >= 0x30000 && ch <= 0x3134F) || // CJK Unified Ideographs Extension G
+			(ch >= 0x31350 && ch <= 0x323AF) || // CJK Unified Ideographs Extension H
+			(ch >= 0x2EBF0 && ch <= 0x2EE5F) || // CJK Unified Ideographs Extension I
+			(ch >= 0x323B0 && ch <= 0x3347F) || // CJK Unified Ideographs Extension J
+			(ch >= 0x3300 && ch <= 0x33FF) || // CJK Compatibility
+			(ch >= 0xFE30 && ch <= 0xFE4F) || // CJK Compatibility Forms
+			(ch >= 0xF900 && ch <= 0xFAFF) || // CJK Compatibility Ideographs
+			(ch >= 0x2F800 && ch <= 0x2FA1F)) // CJK Compatibility Ideographs Supplement
+	}
+	return false
+}
+
 func exportDict(path string, fes []*FileEntries, cols []Column) {
 	file, err := os.Create(path)
 	if err != nil {
@@ -22,6 +44,9 @@ func exportDict(path string, fes []*FileEntries, cols []Column) {
 		}
 		log.Println("导出词库中:", fe.FilePath)
 		for _, entry := range fe.Entries {
+			if isExtendedCJK(entry.data.Text) {
+				continue
+			}
 			_, err := file.WriteString(entry.data.ToStringWithColumns(&cols))
 			if err != nil {
 				panic(err)
