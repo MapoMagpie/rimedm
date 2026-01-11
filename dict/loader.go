@@ -2,6 +2,7 @@ package dict
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/MapoMagpie/rimedm/util"
 	"github.com/goccy/go-yaml"
@@ -100,18 +102,16 @@ func loadFromFile(path string, id uint8, ch chan<- *FileEntries, wg *sync.WaitGr
 	// 在开始读取 码 之前，尝试先读取yaml内容，
 	// 但是此文件也可能不包含yaml内容，
 	// 如果不包含yaml，那么head(buffer)将与bf(buffer)一起用于读取 码
-	head, size, exist := tryReadHead(bf)
-	if exist {
+	head, size, existHead := tryReadHead(bf)
+	if existHead {
 		raw, err := io.ReadAll(head)
 		if err != nil {
 			panic("cant readAll bytes from head buffer")
 		}
 		seek = size
 		config, _ := parseYAML(raw)
-		fe.Columns = parseColumnsOrDefault(&config)
+		fe.Columns, _ = parseColumnsFromYAML(&config)
 		loadExtendDict(path, &config, ch, wg)
-	} else {
-		fe.Columns = []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT}
 	}
 
 	// 函数：读取 码
@@ -128,6 +128,18 @@ func loadFromFile(path string, id uint8, ch chan<- *FileEntries, wg *sync.WaitGr
 				if len(bs) == 0 {
 					continue
 				}
+				// 如果 Columns 不存在，则从第一个有效行中解析 列的顺序
+				if fe.Columns == nil {
+					// 通过制表符`\t`分隔后，分隔物大于一个则为有效行
+					splits := bytes.Split(bs, []byte{'\t'})
+					if len(splits) < 2 {
+						continue
+					}
+					fe.Columns, err = tryParseColumns(splits)
+					if err != nil {
+						panic(err)
+					}
+				}
 				fe.Entries = append(fe.Entries, NewEntry(bs, fe.ID, seek-int64(size), int64(size), &fe.Columns))
 			}
 			if eof != nil {
@@ -135,13 +147,51 @@ func loadFromFile(path string, id uint8, ch chan<- *FileEntries, wg *sync.WaitGr
 			}
 		}
 	}
-
-	if !exist {
+	if !existHead {
 		readEntries(head)
 	}
 	readEntries(bf)
 
 	ch <- fe
+}
+
+func tryParseColumns(splits [][]byte) ([]Column, error) {
+	codeCount, textCount := 0, 0
+	cols := make([]Column, len(splits))
+	for i, sp := range splits {
+		ru := []rune(string(sp))
+		cols[i] = runesColunmType(ru)
+		switch cols[i] {
+		case COLUMN_CODE:
+			codeCount += 1
+		case COLUMN_TEXT:
+			textCount += 1
+		}
+	}
+	if codeCount == 1 && textCount == 1 {
+		return cols, nil
+	}
+	return nil, fmt.Errorf("无法解析 列序(英文码 汉字 [权重])， 码表中的第一个有效项必须包含 英文和汉字，以制表符隔开，顺序随意，权重可选。当前code数量: %d, 当前textCount数量: %d ", codeCount, textCount)
+}
+
+func runesColunmType(rus []rune) Column {
+	hasDigit := false
+	hasLetter := false
+	for _, ru := range rus {
+		if ru > unicode.MaxASCII {
+			return COLUMN_TEXT
+		}
+		if unicode.IsDigit(ru) {
+			hasDigit = true
+		} else if unicode.IsLetter(ru) {
+			hasLetter = true
+		} else {
+		}
+	}
+	if hasDigit && !hasLetter {
+		return COLUMN_WEIGHT
+	}
+	return COLUMN_CODE
 }
 
 func tryReadHead(buf *bytes.Buffer) (*bytes.Buffer, int64, bool) {
@@ -180,11 +230,12 @@ func tryReadHead(buf *bytes.Buffer) (*bytes.Buffer, int64, bool) {
 	return headBuf, size, false
 }
 
-func parseColumnsOrDefault(config *YAML) []Column {
+func parseColumnsFromYAML(config *YAML) ([]Column, error) {
 	cols := parseColumns(config)
 	if len(cols) == 0 {
+		return nil, errors.New("YAML中不存在列声明")
 		// TODO: get example from content to parse cols
-		return []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT}
+		// return []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT}
 	}
 	result := make([]Column, 0)
 	for _, col := range cols {
@@ -199,7 +250,7 @@ func parseColumnsOrDefault(config *YAML) []Column {
 			result = append(result, COLUMN_STEM)
 		}
 	}
-	return result
+	return result, nil
 }
 
 func loadExtendDict(path string, config *YAML, ch chan<- *FileEntries, wg *sync.WaitGroup) {

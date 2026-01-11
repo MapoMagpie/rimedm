@@ -40,7 +40,7 @@ func Test_LoadItems_xhup(t *testing.T) {
 	defer func() {
 		_ = os.RemoveAll("./flypy_user.txt")
 	}()
-	cols := []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT}
+	cols := []Column{COLUMN_TEXT, COLUMN_CODE}
 	tests := []struct {
 		name     string
 		filename string
@@ -69,7 +69,7 @@ func Test_LoadItems_xhup(t *testing.T) {
 					}
 				}
 			}
-			// fmt.Println("count >>", len(entries))
+			// fmt.Println("count >>", len(got))
 			got = got[:3]
 			if !reflect.DeepEqual(got, tt.want) {
 				for _, d := range got {
