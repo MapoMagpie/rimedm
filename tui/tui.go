@@ -271,11 +271,12 @@ func (m *Model) ClearMessage() {
 
 func (m *Model) CurrItemFile() string {
 	currItem, err := m.CurrItem()
-	if err != nil {
+	if err != nil || currItem == nil {
 		return ""
 	}
+	fileId := currItem.Id()
 	for _, file := range m.ListManager.files {
-		if file.Id() == currItem.Id() {
+		if file.Id() == fileId {
 			return filepath.Base(file.String())
 		}
 	}
@@ -409,14 +410,14 @@ func (m *Model) View() string {
 			line := list[i].String()
 			line = truncateString(line, m.wx-16)
 			if i == currIndex {
-				sb.WriteString(fmt.Sprintf("\x1b[31m>\x1b[0m \x1b[1;4;35m\x1b[47m%3d: %s\x1b[0m\n", i+1, line))
+				fmt.Fprintf(&sb, "\x1b[31m>\x1b[0m \x1b[1;4;35m\x1b[47m%3d: %s\x1b[0m\n", i+1, line)
 			} else {
-				sb.WriteString(fmt.Sprintf("> %3d: %s\n", i+1, line))
+				fmt.Fprintf(&sb, "> %3d: %s\n", i+1, line)
 			}
 		}
 	}
 	// footer: search count and filepath of current, or notifition
-	sb.WriteString(fmt.Sprintf("Total: %d; %s\n", le, m.MessageOr(m.CurrItemFile())))
+	fmt.Fprintf(&sb, "Total: %d; %s\n", le, m.MessageOr(m.CurrItemFile()))
 	sb.WriteString("Press[Enter:操作][Ctrl+X:清空输入][Ctrl+S:同步][ESC:退出][Ctrl+H:帮助]\n")
 	if m.Modifying {
 		sb.WriteString("----修改中  按回车提交修改")
@@ -429,15 +430,15 @@ func (m *Model) View() string {
 		for i, menu := range m.menus {
 			nameR := []rune(menu.Name)
 			if i == m.MenuIndex {
-				sb.WriteString(fmt.Sprintf(" \x1b[5;1;31m[\x1b[0m\x1b[35m%s\x1b[0m%s\x1b[5;1;31m]\x1b[0m ", string(nameR[0]), string(nameR[1:])))
+				fmt.Fprintf(&sb, " \x1b[5;1;31m[\x1b[0m\x1b[35m%s\x1b[0m%s\x1b[5;1;31m]\x1b[0m ", string(nameR[0]), string(nameR[1:]))
 			} else {
-				sb.WriteString(fmt.Sprintf(" [\x1b[35m%s\x1b[0m%s] ", string(nameR[0]), string(nameR[1:])))
+				fmt.Fprintf(&sb, " [\x1b[35m%s\x1b[0m%s] ", string(nameR[0]), string(nameR[1:]))
 			}
 		}
 	} else {
 		inputCursor := "\x1b[5;1;31m|\x1b[0m"
 		inp := strings.Join(m.Inputs[:m.InputCursor], "") + inputCursor + strings.Join(m.Inputs[m.InputCursor:], "")
-		sb.WriteString(fmt.Sprintf(":%s", inp))
+		fmt.Fprintf(&sb, ":%s", inp)
 	}
 	s := sb.String()
 	return s
