@@ -35,9 +35,9 @@
       packages = forEachSystem (system: {
         default = pkgsFor.${system}.buildGoModule {
           pname = "rimedm";
-          version = "1.1.2";
+          version = "1.1.5";
           src = ./.;
-          vendorHash = "sha256-cANTPoe6oRSFuKvKW5rZbjUB3Ypm+oPmK7Fi8yDDhfg=";
+          vendorHash = "sha256-x8d0EAKcPJa0VfhUdlFN/GoEK2ZP/DAJQToBkv2/gao=";
         };
       });
 

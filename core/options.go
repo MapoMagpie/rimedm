@@ -16,7 +16,7 @@ import (
 	flags "github.com/spf13/pflag"
 )
 
-var version = "1.1.4"
+var version = "1.1.5"
 
 type Options struct {
 	RestartRimeCmd string   `yaml:"restart_rime_cmd"`
@@ -43,7 +43,7 @@ func ParseOptions() (Options, string) {
 	export := flags.StringP("export", "e", "", "导出码表到此文件，或使用特殊词'stdout'，将会把码表内容输出到标准输出流中。")
 	exportColumns := flags.String("cols", "text,code,weight", "依赖-e参数，导出码表时，导出列(text:字词,code:编码,weight:权重)的顺序。")
 
-	showVersion := flags.Bool("v", false, "显示版本号，在此检查最新版本 https://github.com/MapoMagpie/rimedm")
+	showVersion := flags.BoolP("version", "v", false, "显示版本号，在此检查最新版本 https://github.com/MapoMagpie/rimedm")
 
 	flags.Usage = func() {
 		fmt.Fprintln(os.Stderr, `rimedm: 维护码表的好帮手
