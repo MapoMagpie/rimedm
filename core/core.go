@@ -28,6 +28,11 @@ func Start(opts *Options) {
 	since := time.Since(start)
 	log.Printf("Load %s: %s\n", opts.DictPaths, since)
 	dc := dict.NewDictionary(fes, &dict.CacheMatcher{})
+	if opts.Export != "" {
+		columns := parseColumnsFromArgments(opts.ExportColumns)
+		dc.ExportDict(opts.Export, columns)
+		return
+	}
 
 	// collect file name, will show on addition
 	fileNames := make([]tui.ItemRender, 0)
@@ -489,4 +494,20 @@ func FlushAndSync(opts *Options, dc *dict.Dictionary, sync bool) {
 			panic(fmt.Errorf("exec restart rime cmd error:%v", err))
 		}
 	}
+}
+
+func parseColumnsFromArgments(s string) []dict.Column {
+	splits := strings.SplitSeq(s, ",")
+	columns := make([]dict.Column, 0)
+	for sp := range splits {
+		switch strings.ToLower(sp) {
+		case "text":
+			columns = append(columns, dict.COLUMN_TEXT)
+		case "code":
+			columns = append(columns, dict.COLUMN_CODE)
+		case "weight":
+			columns = append(columns, dict.COLUMN_WEIGHT)
+		}
+	}
+	return columns
 }

@@ -31,9 +31,15 @@ func isExtendedCJK(text string) bool {
 }
 
 func exportDict(path string, fes []*FileEntries, cols []Column) {
-	file, err := os.Create(path)
-	if err != nil {
-		panic(err)
+	var file *os.File
+	if path == "stdout" {
+		file = os.Stdout
+	} else {
+		file_, err := os.Create(path)
+		if err != nil {
+			panic(err)
+		}
+		file = file_
 	}
 	defer func() {
 		_ = file.Close()

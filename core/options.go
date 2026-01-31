@@ -3,7 +3,6 @@ package core
 import (
 	"bufio"
 	"errors"
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -14,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
+	flags "github.com/spf13/pflag"
 )
 
 var version = "1.1.4"
@@ -23,58 +23,99 @@ type Options struct {
 	UserPath       string   `yaml:"user_path"`
 	DictPaths      []string `yaml:"dict_paths"`
 	SyncOnChange   bool     `yaml:"sync_on_change"`
+	Export         string   `yaml:"export"`
+	ExportColumns  string   `yaml:"export_columns"`
 }
 
 func ParseOptions() (Options, string) {
 	configDir, _ := os.UserConfigDir()
-	configPath := filepath.Join(configDir, "rimedm", "config.yaml")
+	defaultConfigPath := filepath.Join(configDir, "rimedm", "config.yaml")
 
-	var flags Options
-	flag.Func("d", "(当使用配置文件时可选)主词典文件(方案名.dict.yaml)路径，通过主词典会自动加载其他拓展词典，无需指定拓展词典。\n支持多个主词典文件，e.g: rimedm -d ./xkjd6.dict.yaml -d ./xhup.dict.txt", func(path string) error {
-		if flags.DictPaths == nil {
-			flags.DictPaths = make([]string, 0)
-		}
-		flags.DictPaths = append(flags.DictPaths, path)
-		return nil
-	})
+	configPath := flags.StringP("config", "c", defaultConfigPath, "配置文件路径，若不指定，将从默认路径读取配置")
 
-	flag.StringVar(&flags.UserPath, "u", "", "(可选)用户词典路径")
-	flag.StringVar(&flags.RestartRimeCmd, "cmd", "", "(可选)同步到词典文件后，用于重新部署rime的命令，使更改即时生效，不同的系统环境下需要不同的命令")
-	flag.BoolVar(&flags.SyncOnChange, "sync", true, "(可选)是否在每次添加、删除、修改时立即同步到词典文件，默认为 true")
-	flag.StringVar(&configPath, "c", configPath, "(可选)配置文件路径，默认位置:"+configPath)
-	showVersion := flag.Bool("v", false, "显示版本号，在此检查最新版本 https://github.com/MapoMagpie/rimedm")
-	flag.Parse()
+	dictPaths := flags.StringArrayP("dict", "d", []string{}, "(当使用配置文件时可选)主词典文件(方案名.dict.yaml)路径，通过主词典会自动加载其他拓展词典，无需指定拓展词典。\n支持多个主词典文件，\ne.g: rimedm -d ./xkjd6.dict.yaml -d ./xhup.dict.txt")
+
+	userPath := flags.StringP("user", "u", "", "用户词典路径，此选项的作用是在加词时默认首选")
+
+	syncOnChange := flags.BoolP("sync", "s", true, "是否在每次添加、删除、修改时立即同步到词典文件")
+	restartRimeCmd := flags.String("cmd", "", "同步到词典文件后，用于重新部署rime的命令，使更改即时生效，不同的系统环境下需要不同的命令")
+
+	export := flags.StringP("export", "e", "", "导出码表到此文件，或使用特殊词'stdout'，将会把码表内容输出到标准输出流中。")
+	exportColumns := flags.String("cols", "text,code,weight", "依赖-e参数，导出码表时，导出列(text:字词,code:编码,weight:权重)的顺序。")
+
+	showVersion := flags.Bool("v", false, "显示版本号，在此检查最新版本 https://github.com/MapoMagpie/rimedm")
+
+	flags.Usage = func() {
+		fmt.Fprintln(os.Stderr, `rimedm: 维护码表的好帮手
+  此程序提供一个Tui界面，当你输入时能实时搜索对应的项。
+  按下确认键可选择将输入内容加入码表，或是在搜索结果中选择要修改、删除的项。
+  注：1. 加词时输入的内容顺序随意，只要以空格隔开即可; 2. 不会破坏码表原本的样式，如注释、配置
+
+选项：`)
+		flags.PrintDefaults()
+		fmt.Fprintln(os.Stderr, `
+示例:
+  1. 省心版，自动检测rime码表并在默认配置路径下生成配置：
+     rimedm
+  2. 导出码表
+     rimedm -e 某某码表.txt
+     rimedm -e 多多码表.txt --cols text,code
+     rimedm -e stdout
+  3. 指定多词典
+     rimedm -d rime/xkjd.dict.yaml -d table/mb.txt(支持所有以制表符分隔字码的码表)
+  4. 禁用修改后 "立即同步码表"、"执行重新部属命令" ，但仍在退出时执行。当你的系统文件性能低，每次加词改词会卡顿时用此方法。
+     rimedm -s false
+			`)
+	}
+	flags.CommandLine.SortFlags = false
+	flags.Parse()
 	if *showVersion {
 		fmt.Println(version)
 		os.Exit(0)
 	}
 
-	configPath = fixPath(configPath)
-	opts := parseFromFile(configPath)
+	fixedConfigPath := fixPath(*configPath)
+	opts := parseFromFile(fixedConfigPath)
 
-	if len(flags.DictPaths) > 0 {
-		opts.DictPaths = flags.DictPaths
+	if len(*dictPaths) > 0 {
+		opts.DictPaths = *dictPaths
 		opts.UserPath = ""
 	}
-	if flags.UserPath != "" {
-		opts.UserPath = flags.UserPath
+	if userPath != nil && *userPath != "" {
+		opts.UserPath = *userPath
 	}
-	if flags.RestartRimeCmd != "" {
-		opts.RestartRimeCmd = flags.RestartRimeCmd
+	if restartRimeCmd != nil && *restartRimeCmd != "" {
+		opts.RestartRimeCmd = *restartRimeCmd
 	}
-	if !flags.SyncOnChange {
+	if export != nil && *export != "" {
+		opts.Export = *export
+	}
+	if exportColumns != nil && *exportColumns != "" {
+		split := strings.SplitSeq(*exportColumns, ",")
+		for sp := range split {
+			switch strings.ToLower(sp) {
+			case "text":
+			case "code":
+			case "weight":
+			default:
+				panic("参数--cols的有效值为text|code|weight，以逗号分隔")
+			}
+		}
+		opts.ExportColumns = *exportColumns
+	}
+	if syncOnChange != nil && !*syncOnChange {
 		opts.SyncOnChange = false
 	}
 
 	if len(opts.DictPaths) == 0 {
-		panic(fmt.Sprintf("未指定词典文件，请检查配置文件[%s]或通过 -d 指定词典文件\n", configPath))
+		panic(fmt.Sprintf("未指定词典文件，请检查配置文件[%s]或通过 -d 指定词典文件\n", fixedConfigPath))
 	}
 
 	for i := range opts.DictPaths {
 		opts.DictPaths[i] = fixPath(opts.DictPaths[i])
 	}
 	opts.UserPath = fixPath(opts.UserPath)
-	return opts, configPath
+	return opts, fixedConfigPath
 }
 
 func initConfigFile(filePath string) {
@@ -336,14 +377,15 @@ func findRimeDicts(rimeConfigDir string) []string {
 }
 
 func fixPath(path string) string {
+	newPath := path
 	if strings.HasPrefix(path, "~") {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			panic(err)
 		}
-		path = homeDir + path[1:]
+		newPath = homeDir + (path)[1:]
 	}
-	return os.ExpandEnv(path)
+	return os.ExpandEnv(newPath)
 }
 
 func parseVersion(version string) []int {
