@@ -16,7 +16,7 @@ import (
 	flags "github.com/spf13/pflag"
 )
 
-var version = "1.1.5"
+var version = "1.1.6"
 
 type Options struct {
 	RestartRimeCmd string   `yaml:"restart_rime_cmd"`
