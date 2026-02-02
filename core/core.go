@@ -96,9 +96,10 @@ func Start(opts *Options) {
 		Cb: func(m *tui.Model) (cmd tea.Cmd) {
 			item, err := m.CurrItem()
 			if err != nil {
-				m.Inputs = []string{}
-				m.InputCursor = 0
-				return tui.ExitMenuCmd
+				// log.Printf("delete item err: %e\n", err)
+				// m.Inputs = []string{}
+				// m.InputCursor = 0
+				return nil
 			}
 			switch item := item.(type) {
 			case *dict.MatchResult:
@@ -126,7 +127,15 @@ func Start(opts *Options) {
 			}
 			m.Modifying = true
 			modifyingItem = item
-			m.Inputs = strings.Split(strings.TrimSpace(modifyingItem.String()), "")
+			m.Inputs = make([]string, 0)
+			split := strings.SplitSeq(strings.TrimSpace(modifyingItem.String()), "")
+			for sp := range split {
+				if sp == "	" {
+					m.Inputs = append(m.Inputs, " ")
+				} else {
+					m.Inputs = append(m.Inputs, sp)
+				}
+			}
 			m.InputCursor = len(m.Inputs)
 			m.MenuIndex = 0
 			return tui.ExitMenuCmd
@@ -203,7 +212,7 @@ func Start(opts *Options) {
 		return menus
 	}
 	model := tui.NewModel(listManager, menuFetcher)
-	teaProgram := tea.NewProgram(model)
+	teaProgram := tea.NewProgram(model, tea.WithAltScreen())
 
 	listManager.ExportOptions = []tui.ItemRender{
 		tui.StringRender("字词"),
@@ -281,12 +290,13 @@ func Start(opts *Options) {
 			// adjust the columns of export dict
 			if m.ListManager.ListMode == tui.LIST_MODE_EXPO {
 				var newIndex int
-				if key == "ctrl+up" {
+				switch key {
+				case "ctrl+up":
 					newIndex = listManager.ExportOptionsIndex + 1
 					if newIndex >= len(listManager.ExportOptions) {
 						return m, nil
 					}
-				} else if key == "ctrl+down" {
+				case "ctrl+down":
 					newIndex = listManager.ExportOptionsIndex - 1
 					if newIndex < 0 {
 						return m, nil

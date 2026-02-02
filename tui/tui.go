@@ -3,6 +3,7 @@ package tui
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -406,14 +407,31 @@ func (m *Model) View() string {
 		if currIndex > top {
 			top, bot = currIndex, currIndex-renderCnt+1
 		}
+		maxWidth := make([]int, 10)
+		lines := make([]RenderLine, 0)
 		for i := top; i >= bot; i-- {
-			line := list[i].String()
-			line = truncateString(line, m.wx-16)
-			if i == currIndex {
-				fmt.Fprintf(&sb, "\x1b[31m>\x1b[0m \x1b[1;4;35m\x1b[47m%3d: %s\x1b[0m\n", i+1, line)
-			} else {
-				fmt.Fprintf(&sb, "> %3d: %s\n", i+1, line)
+			l := parseRenderLine(list[i].String(), i, m.wx-20)
+			lines = append(lines, l)
+			for i, w := range l.wids {
+				maxWidth[i] = int(math.Max(float64(maxWidth[i]), float64(w)))
 			}
+		}
+		for _, l := range lines {
+			asniReset := ""
+			if l.lineNo == currIndex {
+				asniReset = "\x1b[0m"
+				fmt.Fprintf(&sb, "\x1b[31m>\x1b[0m \x1b[1;4;35m\x1b[47m%3d: ", l.lineNo+1)
+			} else {
+				fmt.Fprintf(&sb, "> %3d: ", l.lineNo+1)
+			}
+			for i, d := range l.dash {
+				sb.WriteString(d)
+				padding := maxWidth[i] - l.wids[i] + 4
+				for range padding {
+					sb.WriteByte(' ')
+				}
+			}
+			fmt.Fprintln(&sb, asniReset)
 		}
 	}
 	// footer: search count and filepath of current, or notifition
@@ -442,6 +460,62 @@ func (m *Model) View() string {
 	}
 	s := sb.String()
 	return s
+}
+
+type RenderLine struct {
+	dash   []string
+	wids   []int
+	lineNo int
+	width  int
+}
+
+func parseRenderLine(s string, lineNo int, maxWidth int) RenderLine {
+	wids := make([]int, 0)
+	dash := make([]string, 0)
+	dashWidth := 0
+	dashIndex := 0
+	width := 0
+	last := 0
+	maxDash := 0
+	for i, r := range s {
+		if r == '\t' {
+			dash = append(dash, s[last:i])
+			wids = append(wids, dashWidth)
+			if dashWidth > wids[maxDash] {
+				maxDash = dashIndex
+			}
+			dashWidth = 0
+			dashIndex += 1
+			last = i + 1
+			continue
+		}
+		w := runewidth.RuneWidth(r)
+		dashWidth += w
+		width += w
+	}
+	dash = append(dash, s[last:])
+	wids = append(wids, dashWidth)
+	if wids[dashIndex] > wids[maxDash] {
+		maxDash = dashIndex
+	}
+	if width > maxWidth {
+		reduce := width - maxWidth
+		rs := []rune(dash[maxDash])
+		wi := 0
+		end := len(rs)
+		for i := len(rs); i > 0; i-- {
+			end = i
+			wi += runewidth.RuneWidth(rs[i-1])
+			if wi >= reduce {
+				break
+			}
+		}
+		dash[maxDash] = string(rs[:end])
+		wids[maxDash] = wids[maxDash] - wi
+	}
+	return RenderLine{
+		dash: dash, wids: wids, lineNo: lineNo, width: width,
+	}
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -486,18 +560,4 @@ func NewModel(listManager *ListManager, menuFetcher func(m *Model) []*Menu) *Mod
 	}
 	model := &Model{ListManager: listManager, wx: wx, hx: hx, menuFetcher: menuFetcher, eventManager: NewEventManager(), message: ""}
 	return model
-}
-
-func truncateString(s string, wx int) string {
-	width := 0
-	end := len(s)
-	for i, r := range s {
-		w := runewidth.RuneWidth(r) // 获取字符宽度
-		if width+w > wx {
-			end = i
-			break
-		}
-		width += w
-	}
-	return s[:end]
 }
