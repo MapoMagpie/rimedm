@@ -47,7 +47,7 @@ func LoadItems(paths ...string) (fes []*FileEntries) {
 	var wg sync.WaitGroup
 	for _, path := range paths {
 		wg.Add(1)
-		go loadFromFile(path, util.IDGen.NextID(), ch, &wg)
+		go loadFromFile(path, util.IDGen.NextID(), nil, ch, &wg)
 	}
 	go func() {
 		wg.Wait()
@@ -74,7 +74,7 @@ var (
 	YAML_END   = "..."
 )
 
-func loadFromFile(path string, id uint8, ch chan<- *FileEntries, wg *sync.WaitGroup) {
+func loadFromFile(path string, id uint8, columns *[]Column, ch chan<- *FileEntries, wg *sync.WaitGroup) {
 	defer wg.Done()
 	fe := &FileEntries{FilePath: path, Entries: make([]*Entry, 0), ID: id}
 	file, err := os.OpenFile(path, os.O_RDONLY, 0666)
@@ -111,9 +111,11 @@ func loadFromFile(path string, id uint8, ch chan<- *FileEntries, wg *sync.WaitGr
 		seek = size
 		config, _ := parseYAML(raw)
 		fe.Columns, _ = parseColumnsFromYAML(&config)
-		loadExtendDict(path, &config, ch, wg)
+		loadExtendDict(path, &config, &fe.Columns, ch, wg)
 	}
-
+	if fe.Columns == nil && columns != nil {
+		fe.Columns = *columns
+	}
 	// 函数：读取 码
 	readEntries := func(buf *bytes.Buffer) {
 		for {
@@ -137,7 +139,20 @@ func loadFromFile(path string, id uint8, ch chan<- *FileEntries, wg *sync.WaitGr
 					}
 					fe.Columns, err = tryParseColumns(splits)
 					if err != nil {
-						panic(err)
+						fmt.Fprintf(os.Stderr, "\x1b[31m警告：无法自动解析 列序([字词 编码 [权重?]])\x1b[0m\n"+
+							`码表中的第一个有效项必须包含 英文和汉字，以制表符隔开，如 [nihao 你好]、[你好 nihao]
+当前第一个有效项为：[%s]，位于： %s
+
+！！！现启用默认的列序： [字词 编码 权重]，若与码表实际的列序不同，将导致无法搜索与修改！
+请解决此问题在 %s 中
+方式一：使码表的第一个有效项包含英文和汉字；
+方式二：在码表的配置中指定columns
+columns:
+  - text
+  - weight
+  - code
+`, string(bs), path, path)
+						fe.Columns = []Column{COLUMN_TEXT, COLUMN_CODE, COLUMN_WEIGHT}
 					}
 				}
 				fe.Entries = append(fe.Entries, NewEntry(bs, fe.ID, seek-int64(size), int64(size), &fe.Columns))
@@ -253,12 +268,12 @@ func parseColumnsFromYAML(config *YAML) ([]Column, error) {
 	return result, nil
 }
 
-func loadExtendDict(path string, config *YAML, ch chan<- *FileEntries, wg *sync.WaitGroup) {
+func loadExtendDict(path string, config *YAML, columns *[]Column, ch chan<- *FileEntries, wg *sync.WaitGroup) {
 	paths := parseExtendPaths(path, config)
 	wg.Add(len(paths))
 	for _, extendPath := range paths {
 		go func(newPath string, id uint8) {
-			loadFromFile(newPath, id, ch, wg)
+			loadFromFile(newPath, id, columns, ch, wg)
 		}(extendPath, util.IDGen.NextID())
 	}
 }

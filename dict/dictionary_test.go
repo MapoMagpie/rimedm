@@ -6,6 +6,7 @@ import (
 	"math"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	// "github.com/lithammer/fuzzysearch/fuzzy"
@@ -77,7 +78,7 @@ func Test_fuzzy_Search(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				rawLen := len(got)
 				wantLen := len(tt.want)
-				info := ""
+				var info strings.Builder
 				for i := range int(math.Max(float64(rawLen), float64(wantLen))) {
 					var raw string
 					var want string
@@ -87,9 +88,9 @@ func Test_fuzzy_Search(t *testing.T) {
 					if i < wantLen {
 						want = tt.want[i]
 					}
-					info += "got: " + raw + "\t\twant:" + want + "\n"
+					info.WriteString("got: " + raw + "\t\twant:" + want + "\n")
 				}
-				t.Errorf("Search() key: [%s] got and want\n%s", tt.pattern, info)
+				t.Errorf("Search() key: [%s] got and want\n%s", tt.pattern, info.String())
 			}
 		})
 	}
@@ -172,7 +173,7 @@ func Test_Dictionary_Search(t *testing.T) {
 				if !reflect.DeepEqual(entries, want) {
 					rawLen := len(entries)
 					wantLen := len(want)
-					info := ""
+					var info strings.Builder
 					for i := range int(math.Max(float64(rawLen), float64(wantLen))) {
 						raw := "EMPTY"
 						wan := "EMPTY"
@@ -182,9 +183,9 @@ func Test_Dictionary_Search(t *testing.T) {
 						if i < wantLen {
 							wan = want[i].raw
 						}
-						info += "got: " + raw + "\t\twant:" + wan + "\n"
+						info.WriteString("got: " + raw + "\t\twant:" + wan + "\n")
 					}
-					t.Errorf("Search() key: [%s] got and want\n%s", tt.args.key, info)
+					t.Errorf("Search() key: [%s] got and want\n%s", tt.args.key, info.String())
 				}
 			}
 		})
