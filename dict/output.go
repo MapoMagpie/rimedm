@@ -30,7 +30,7 @@ func isExtendedCJK(text string) bool {
 	return false
 }
 
-func exportDict(path string, fes []*FileEntries, cols []Column) {
+func exportDict(path string, fes []*FileEntries, cols []Column, sortByWeight bool) {
 	var file *os.File
 	if path == "stdout" {
 		file = os.Stdout
@@ -44,23 +44,30 @@ func exportDict(path string, fes []*FileEntries, cols []Column) {
 	defer func() {
 		_ = file.Close()
 	}()
+	entries := make([]*Entry, 0)
 	for _, fe := range fes {
 		if len(fe.Entries) == 0 {
 			continue
 		}
-		log.Println("导出词库中:", fe.FilePath)
-		for _, entry := range fe.Entries {
-			if isExtendedCJK(entry.data.Text) {
-				continue
-			}
-			_, err := file.WriteString(entry.data.ToStringWithColumns(&cols))
-			if err != nil {
-				panic(err)
-			}
-			_, err = file.WriteString("\n")
-			if err != nil {
-				panic(err)
-			}
+		entries = append(entries, fe.Entries...)
+	}
+	if sortByWeight {
+		sort.Slice(entries, func(i, j int) bool {
+			return entries[i].data.Weight > entries[j].data.Weight
+		})
+	}
+	for _, entry := range entries {
+		log.Println("导出词库中:", path)
+		if isExtendedCJK(entry.data.Text) {
+			continue
+		}
+		_, err := file.WriteString(entry.data.ToStringWithColumns(&cols))
+		if err != nil {
+			panic(err)
+		}
+		_, err = file.WriteString("\n")
+		if err != nil {
+			panic(err)
 		}
 	}
 }

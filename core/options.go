@@ -25,6 +25,7 @@ type Options struct {
 	SyncOnChange   bool     `yaml:"sync_on_change"`
 	Export         string   `yaml:"export"`
 	ExportColumns  string   `yaml:"export_columns"`
+	ExportWithSort bool     `yaml:"export_with_sort"`
 }
 
 func ParseOptions() (Options, string) {
@@ -42,6 +43,7 @@ func ParseOptions() (Options, string) {
 
 	export := flags.StringP("export", "e", "", "导出码表到此文件，或使用特殊词'stdout'，将会把码表内容输出到标准输出流中。")
 	exportColumns := flags.String("cols", "text,code,weight", "依赖-e参数，导出码表时，导出列(text:字词,code:编码,weight:权重)的顺序。")
+	exportWithSort := flags.Bool("sort", false, "依赖-e参数，导出码表时，将根据权重重新排序。有些输入法(fcitx5-chinese-addons)没有权重设计，依靠字词在文件中的顺序来决定候选顺序。如果当前码表也没有权重，那么将保持不变。")
 
 	showVersion := flags.BoolP("version", "v", false, "显示版本号，在此检查最新版本 https://github.com/MapoMagpie/rimedm")
 
@@ -102,6 +104,9 @@ func ParseOptions() (Options, string) {
 			}
 		}
 		opts.ExportColumns = *exportColumns
+	}
+	if exportWithSort != nil && *exportWithSort {
+		opts.ExportWithSort = true
 	}
 	if syncOnChange != nil && !*syncOnChange {
 		opts.SyncOnChange = false

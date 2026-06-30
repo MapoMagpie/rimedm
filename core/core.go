@@ -30,7 +30,7 @@ func Start(opts *Options) {
 	dc := dict.NewDictionary(fes, &dict.CacheMatcher{})
 	if opts.Export != "" {
 		columns := parseColumnsFromArgments(opts.ExportColumns)
-		dc.ExportDict(opts.Export, columns)
+		dc.ExportDict(opts.Export, columns, opts.ExportWithSort)
 		return
 	}
 
@@ -228,7 +228,7 @@ func Start(opts *Options) {
 		m.ListManager.ListMode = tui.LIST_MODE_DICT
 		m.HideMenus()
 		go func() {
-			filePath := "output.txt"
+			filePath := "exported_dict.txt"
 			columns := make([]dict.Column, 0)
 			options := listManager.ExportOptions[:3]
 			for _, opt := range options {
@@ -249,8 +249,8 @@ func Start(opts *Options) {
 			}
 			time.Sleep(time.Second)
 			if len(columns) > 0 {
-				dc.ExportDict(filePath, columns)
-				teaProgram.Send(tui.NotifitionMsg("完成导出码表 > output.txt"))
+				dc.ExportDict(filePath, columns, opts.ExportWithSort)
+				teaProgram.Send(tui.NotifitionMsg("完成导出码表 > exported_dict.txt"))
 			} else {
 				teaProgram.Send(tui.NotifitionMsg("没有东西要导出"))
 			}
